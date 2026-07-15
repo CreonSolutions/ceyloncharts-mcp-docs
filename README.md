@@ -1,4 +1,6 @@
-<img src="assets/logo-text-light-1024.png" alt="CeylonCharts" width="240">
+<p align="center">
+  <img src="assets/logo-text-light-1024.png" alt="CeylonCharts" width="100%">
+</p>
 
 # CeylonCharts MCP Server
 
