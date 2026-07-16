@@ -25,3 +25,13 @@ echo "== Announcements for AAF =="
 curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
   "$BASE_URL/v1/announcements/AAF"
 echo
+
+echo "== List indices =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/indices" | head -c 500
+echo
+
+echo "== ASPI index data (Jan 2025, CSV) =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/indices/ASPI/data?from=2025-01-01&to=2025-01-31&format=csv"
+echo

@@ -9,8 +9,11 @@ function headers() {
   };
 }
 
-async function getSymbols() {
-  const res = await fetch(`${BASE_URL}/v1/symbols`, { headers: headers() });
+async function getSymbols({ query, sector } = {}) {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (sector) params.set("sector", sector);
+  const res = await fetch(`${BASE_URL}/v1/symbols?${params}`, { headers: headers() });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.json();
 }
@@ -24,12 +27,24 @@ async function getOhlc(symbol, { from, to, interval = "daily" } = {}) {
   return res.json();
 }
 
+async function getIndexData(index, { from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const res = await fetch(`${BASE_URL}/v1/indices/${index}/data?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 async function main() {
   const symbols = await getSymbols();
   console.log(symbols.slice(0, 5));
 
   const ohlc = await getOhlc("SAMP", { from: "2025-01-01", to: "2025-01-31" });
   console.log(ohlc);
+
+  const indexData = await getIndexData("ASPI", { from: "2025-01-01", to: "2025-01-31" });
+  console.log(indexData);
 }
 
 main().catch((err) => {

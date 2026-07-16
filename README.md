@@ -5,7 +5,8 @@
 # CeylonCharts MCP Server
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history, financial
-statements, corporate announcements, and macroeconomic indicators — available as:
+statements, corporate announcements, market/sector indices, and macroeconomic
+indicators — available as:
 
 - A **REST API** (`https://mcp.ceyloncharts.com/api`)
 - An **MCP server** (`https://mcp.ceyloncharts.com/mcp/`) for AI agents and assistants
@@ -17,7 +18,7 @@ endpoints. It does not contain the server's source code.
 ## Contents
 
 - [Getting Started](docs/getting-started.md) — connect from Claude.ai, Claude Desktop, or plain HTTP
-- [MCP Tools Reference](docs/mcp-tools.md) — the six tools exposed over MCP
+- [MCP Tools Reference](docs/mcp-tools.md) — the eight tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
@@ -33,6 +34,8 @@ endpoints. It does not contain the server's source code.
 | `get_announcements` | Corporate announcements/filings |
 | `get_macro_series` | List available macroeconomic series |
 | `get_macro_data` | Macroeconomic indicator data |
+| `get_indices` | List CSE market/sector indices (ASPI, S&P SL20, industry sub-indices) |
+| `get_index_data` | Historical data for a market/sector index |
 
 See [docs/mcp-tools.md](docs/mcp-tools.md) for full input/output shapes.
 

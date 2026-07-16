@@ -15,8 +15,13 @@ def _headers() -> dict:
     }
 
 
-def get_symbols() -> list:
-    resp = requests.get(f"{BASE_URL}/v1/symbols", headers=_headers())
+def get_symbols(query: str | None = None, sector: str | None = None) -> list:
+    params = {}
+    if query:
+        params["q"] = query
+    if sector:
+        params["sector"] = sector
+    resp = requests.get(f"{BASE_URL}/v1/symbols", headers=_headers(), params=params)
     resp.raise_for_status()
     return resp.json()
 
@@ -44,6 +49,25 @@ def get_financials(symbol: str, from_date: str | None = None, to_date: str | Non
     return resp.json()
 
 
+def get_indices(query: str | None = None) -> list:
+    params = {"q": query} if query else {}
+    resp = requests.get(f"{BASE_URL}/v1/indices", headers=_headers(), params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_index_data(index: str, from_date: str | None = None, to_date: str | None = None) -> dict:
+    params = {}
+    if from_date:
+        params["from"] = from_date
+    if to_date:
+        params["to"] = to_date
+    resp = requests.get(f"{BASE_URL}/v1/indices/{index}/data", headers=_headers(), params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+
 if __name__ == "__main__":
     print(get_symbols()[:5])
     print(get_ohlc("SAMP", from_date="2025-01-01", to_date="2025-01-31"))
+    print(get_index_data("ASPI", from_date="2025-01-01", to_date="2025-01-31"))
