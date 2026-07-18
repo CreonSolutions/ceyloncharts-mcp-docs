@@ -67,7 +67,28 @@ def get_index_data(index: str, from_date: str | None = None, to_date: str | None
     return resp.json()
 
 
+def get_technicals(symbol: str, limit: int = 50, offset: int = 0) -> dict:
+    params = {"limit": limit, "offset": offset}
+    resp = requests.get(f"{BASE_URL}/v1/technicals/{symbol}", headers=_headers(), params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def screen_stocks(**filters) -> dict:
+    resp = requests.get(f"{BASE_URL}/v1/screener/stocks", headers=_headers(), params=filters)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def screen_indices(**filters) -> dict:
+    resp = requests.get(f"{BASE_URL}/v1/screener/indices", headers=_headers(), params=filters)
+    resp.raise_for_status()
+    return resp.json()
+
+
 if __name__ == "__main__":
     print(get_symbols()[:5])
     print(get_ohlc("SAMP", from_date="2025-01-01", to_date="2025-01-31"))
     print(get_index_data("ASPI", from_date="2025-01-01", to_date="2025-01-31"))
+    print(get_technicals("SAMP", limit=20))
+    print(screen_stocks(above_ema50="true", above_ema200="true", rs_rating_min=80))

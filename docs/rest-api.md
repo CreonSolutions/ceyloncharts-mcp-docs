@@ -128,13 +128,120 @@ CSE market/sector indices come in two shapes, distinguished by `is_main_index`:
 `price_index`, `per`, `pbv`, `dy`, `companies_traded`, `companies_listed` are
 carried through as-is from the source data and may be null on either shape.
 
+## Corporate Action Adjustments (OHLC only)
+
+`GET /v1/ohlc/:symbol` can adjust historical prices for corporate actions so
+the series is continuous through splits, rights issues, and (optionally)
+dividends. Three independent boolean query params control this:
+
+| Param | Default | Adjusts for |
+|-------|---------|-------------|
+| `adjust_splits` | `true` | Stock splits and scrip/bonus share dividends — structural share-count changes where no payment changes hands |
+| `adjust_rights` | `false` | Dilution from a rights issue (theoretical-ex-rights-price formula) |
+| `adjust_dividends` | `false` | Cash dividends — turn on for a total-return series instead of raw price action |
+
+Splits default **on** (clean, continuous price action is the common case);
+rights and dividends default **off** (opt in explicitly).
+
+The response always reports which flags were active and lists every corporate
+action that fell within the requested `from`/`to` range — **regardless of
+whether its flag was on** — so a caller with `adjust_dividends=false` (the
+default) still learns that a real ex-dividend date is why the raw price
+dipped, rather than mistaking it for noise:
+
+- JSON: `meta.adjustments: { splits, rights, dividends }` (booleans) and
+  `meta.events: [{ date, kind, factor, detail, adjusted }]`.
+- CSV: `X-Adjustments` header (comma-joined active flags, e.g. `splits,rights`)
+  and `X-Adjustment-Events` header (`date:kind:factor:adjusted` quads joined by
+  `;`).
+
+## Pagination (OHLC and Technicals)
+
+`GET /v1/ohlc/:symbol` and `GET /v1/technicals/:symbol` share the same
+pagination model. Three params control the window:
+
+| Param | Default | Meaning |
+|-------|---------|---------|
+| `from` / `to` | none | Optional date bounds |
+| `limit` | 50 | Max trading days returned, capped at 500 |
+| `offset` | 0 | Skip this many of the most recent trading days before taking `limit` |
+
+The query always runs most-recent-first, then reverses to chronological order
+for the response. `limit` always caps the result, even with an explicit
+`from`/`to` range — a 3-year date range still only returns the most recent
+`limit` rows within it. For `GET /v1/ohlc/:symbol`, `meta.from`/`meta.to`
+reflect the *actual* returned row bounds, not the raw query params.
+
+If more history is available beyond the current page:
+
+- JSON: `meta.hasMore: boolean`, plus `meta.nextOffset` (present only when
+  `hasMore` is true — pass it as `offset` to get the next page).
+- CSV: `X-Has-More` / `X-Next-Offset` headers.
+
+## Screener
+
+`GET /v1/screener/stocks` and `GET /v1/screener/indices` filter the whole
+market (or the whole set of sector/headline indices) by pre-computed daily
+technicals — moving-average position, relative-strength rating, 52-week range,
+and volume anomalies. This is a cross-sectional *snapshot* for one trading
+day, distinct from [`GET /v1/technicals/:symbol`](#get-v1technicalssymbol),
+which is a time series for one symbol.
+
+Every filter param is optional and combined with `AND`; omitting a filter
+means "don't constrain on that dimension." Both endpoints share:
+
+| Param | Meaning |
+|-------|---------|
+| `above_sma10` / `above_ema21` / `above_ema50` / `above_ema200` | Price above (`true`) or below (`false`) that moving average |
+| `rs_rating_min` / `rs_rating_max` | Relative-strength rating, 1-99 percentile rank vs. the whole market |
+| `change_pct_min` / `change_pct_max` | Today's percent change |
+| `date` | Defaults to the latest available trading date |
+| `sort` / `order` | Sort column and direction (default `rs_rating` desc) |
+| `limit` | Default 20, capped at 100 |
+| `format` | `csv` for the [CSV Response Format](#csv-response-format), default JSON |
+
+`/screener/stocks` additionally supports:
+
+| Param | Meaning |
+|-------|---------|
+| `is_52w_high` / `is_52w_low` | At a 52-week high/low today |
+| `is_hve` / `is_hv1` / `is_hvytd` | Highest volume ever / in the past 252 trading days / year-to-date |
+| `vol_vs_sma50_pct_min` / `vol_vs_sma50_pct_max` | Today's volume vs. its 50-day average, as a percent (e.g. `100` = 2x average) |
+| `sector` | Substring match against the company's sector |
+| `sort` | Also accepts `vol_vs_sma50_pct` |
+
+These don't exist on `/screener/indices` — 52-week range and volume-anomaly
+detection aren't computed for indices.
+
+Note the screener's own moving averages/prices are **split-adjusted only** —
+not necessarily on the same adjustment basis as `GET /v1/ohlc/:symbol`'s
+`adjust_rights`/`adjust_dividends` output. Don't assume the two are
+numerically comparable close-for-close.
+
+There's no ambiguous/not-found case for the screener — an empty `data` array
+(or empty CSV body) just means nothing matched the filters.
+
+## Technicals
+
+`GET /v1/technicals/:symbol` returns the same pre-computed daily technicals as
+the screener, but as a time series for a **single** symbol — a stock ticker
+or an index (`ASPI`, `SNP20`, `Energy`, ...), one endpoint serves both.
+
+Row fields omit `above_sma10`/`above_ema21`/`above_ema50`/`above_ema200`
+(derivable from `close` vs. the corresponding moving average, both of which
+are in the row) but keep `is_52w_high`/`is_52w_low`/`is_hve`/`is_hv1`/`is_hvytd`
+(not derivable from anything else in the row).
+
+Shares the [pagination model](#pagination-ohlc-and-technicals) with OHLC.
+
 ## CSV Response Format
 
 Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
 `/v1/financials/:symbol`, `/v1/announcements/:symbol`, `/v1/macro/series`,
-`/v1/macro/data`, `/v1/indices`, `/v1/indices/:index/data`) accepts
-`?format=csv` as an alternative to the default JSON envelope. JSON stays the
-default.
+`/v1/macro/data`, `/v1/indices`, `/v1/indices/:index/data`,
+`/v1/screener/stocks`, `/v1/screener/indices`, `/v1/technicals/:symbol`)
+accepts `?format=csv` as an alternative to the default JSON envelope. JSON
+stays the default.
 
 ```
 Content-Type: text/csv; charset=utf-8
@@ -154,6 +261,10 @@ instead:
 | `X-Resolved-From` | Resolution used name/fuzzy matching (differs from the resolved identifier) |
 | `X-Resolved-Name` | Endpoint returns company/series-level data (financials, announcements, macro data) |
 | `X-Other-Instruments` | OHLC only — sibling instruments of the same company, `symbol:type` pairs joined by `;`, e.g. `SAMP.X0000:non-voting` |
+| `X-Adjustments` | OHLC only — active `adjust_*` flags, comma-joined, e.g. `splits,rights` |
+| `X-Adjustment-Events` | OHLC only — corporate actions in range, `date:kind:factor:adjusted` quads joined by `;` — see [Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only) |
+| `X-Screen-Date` | Screener only — the trade date the results were computed for |
+| `X-Has-More` / `X-Next-Offset` | OHLC and Technicals only — see [Pagination](#pagination-ohlc-and-technicals) |
 | `X-Result-Count` | Always |
 
 **Ambiguous and not-found responses always stay JSON** regardless of
@@ -200,7 +311,11 @@ Accepts a ticker (exact instrument or bare company symbol), company name, or
 typo of either, including the multi-instrument default/disambiguation behavior.
 
 Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `interval` (`daily` |
-`weekly` | `monthly`), `format` (optional, `csv`).
+`weekly` | `monthly`), `adjust_splits`/`adjust_rights`/`adjust_dividends`
+(booleans, default `true`/`false`/`false` — see
+[Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only)),
+`limit` (default 50, max 500), `offset` (default 0) — see
+[Pagination](#pagination-ohlc-and-technicals), `format` (optional, `csv`).
 
 ```json
 {
@@ -211,7 +326,10 @@ Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `interval` (`daily` |
     "to": "2024-01-02",
     "count": 2,
     "resolvedFrom": "SAMP",
-    "otherInstruments": [{ "symbol": "SAMP.X0000", "type": "non-voting" }]
+    "otherInstruments": [{ "symbol": "SAMP.X0000", "type": "non-voting" }],
+    "adjustments": { "splits": true, "rights": false, "dividends": false },
+    "events": [{ "date": "2024-01-02", "kind": "dividend", "factor": 0.99, "detail": "final dividend (Rs.5.00/share)", "adjusted": false }],
+    "hasMore": false
   },
   "data": [
     { "date": "2024-01-01", "open": 100, "high": 105, "low": 99, "close": 103, "volume": 10000 },
@@ -221,6 +339,9 @@ Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `interval` (`daily` |
 ```
 
 `resolvedFrom` and `otherInstruments` are only present when relevant.
+`adjustments` and `hasMore` are always present; `events`/`nextOffset` only
+when there's something to report. Defaults to the most recent 50 trading
+days if no range is given.
 
 ### `GET /v1/financials/:symbol`
 
@@ -285,7 +406,59 @@ Response `meta` additionally includes `name` and `resolvedFrom`. Row fields:
 `sector_turnover`, `sector_volume`, `sector_trades`, `price_index`, `per`,
 `pbv`, `dy`, `companies_traded`, `companies_listed`.
 
+### `GET /v1/screener/stocks`
+
+Screens CSE stocks by pre-computed daily technicals — see
+[Screener](#screener) for the full param list.
+
+Query params: `above_sma10`/`above_ema21`/`above_ema50`/`above_ema200` (bool),
+`rs_rating_min`/`rs_rating_max`, `change_pct_min`/`change_pct_max`,
+`is_52w_high`/`is_52w_low` (bool), `is_hve`/`is_hv1`/`is_hvytd` (bool),
+`vol_vs_sma50_pct_min`/`vol_vs_sma50_pct_max`, `sector`, `date`, `sort`
+(`rs_rating`|`change_pct`|`vol_vs_sma50_pct`|`close`, default `rs_rating`),
+`order` (`asc`|`desc`, default `desc`), `limit` (default 20, max 100),
+`format`.
+
+Response row fields: `symbol`, `name`, `close`, `change_pct`, `volume`,
+`vol_sma50`, `vol_vs_sma50_pct`, `sma10`, `ema21`, `ema50`, `ema200`,
+`above_sma10`, `above_ema21`, `above_ema50`, `above_ema200`, `high_52w`,
+`low_52w`, `is_52w_high`, `is_52w_low`, `is_hve`, `is_hv1`, `is_hvytd`,
+`rs_line`, `rs_rating`. Response shape: `{ meta: { date, sort, order, count }, data: [...] }`.
+
+### `GET /v1/screener/indices`
+
+Screens CSE sector/headline indices by the same trend criteria — see
+[Screener](#screener). No 52-week-range or volume params; those aren't
+tracked for indices.
+
+Query params: `above_sma10`/`above_ema21`/`above_ema50`/`above_ema200` (bool),
+`rs_rating_min`/`rs_rating_max`, `change_pct_min`/`change_pct_max`, `date`,
+`sort` (`rs_rating`|`change_pct`|`close`, default `rs_rating`), `order`
+(`asc`|`desc`, default `desc`), `limit` (default 20, max 100), `format`.
+
+Response row fields: `symbol`, `name`, `close`, `change_pct`, `sma10`,
+`ema21`, `ema50`, `ema200`, `above_sma10`, `above_ema21`, `above_ema50`,
+`above_ema200`, `rs_line`, `rs_rating`.
+
+### `GET /v1/technicals/:symbol`
+
+Pre-computed daily technicals for a single stock or index over time — see
+[Technicals](#technicals). Accepts a ticker, company name, index
+symbol/name/abbreviation, or typo of any.
+
+Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `limit` (default 50,
+max 500), `offset` (default 0) — see
+[Pagination](#pagination-ohlc-and-technicals), `format` (optional, `csv`).
+
+Response `meta` additionally includes `resolvedFrom` when resolved by
+name/abbreviation/fuzzy match, and `hasMore`/`nextOffset` for pagination.
+Response row fields: `date`, `close`, `change_pct`, `volume`, `vol_sma10`,
+`vol_sma20`, `vol_sma50`, `vol_vs_sma50_pct`, `sma10`, `ema21`, `ema50`,
+`ema200`, `high_52w`, `low_52w`, `is_52w_high`, `is_52w_low`, `is_hve`,
+`is_hv1`, `is_hvytd`, `rs_line`, `rs_rating`.
+
 ## Caching
 
 `GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials`,
-`/v1/announcements`, and `/v1/indices` are cached for up to 5 minutes.
+`/v1/announcements`, `/v1/indices`, `/v1/screener`, and `/v1/technicals` are
+cached for up to 5 minutes.

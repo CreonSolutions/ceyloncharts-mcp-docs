@@ -65,9 +65,14 @@ Daily/weekly/monthly OHLCV price history.
 | Argument | Type | Required | Notes |
 |----------|------|----------|-------|
 | `symbol` | string | yes | Ticker or company name — see [resolution](#symbol--series--index-resolution) |
-| `from` | string (`YYYY-MM-DD`) | no | Defaults to 365 days before `to` |
-| `to` | string (`YYYY-MM-DD`) | no | Defaults to today |
+| `from` | string (`YYYY-MM-DD`) | no | Optional date bound |
+| `to` | string (`YYYY-MM-DD`) | no | Optional date bound |
 | `interval` | `"daily"` \| `"weekly"` \| `"monthly"` | no | Defaults to `daily` |
+| `adjust_splits` | boolean | no | Adjust for stock splits/scrip dividends. Default `true` |
+| `adjust_rights` | boolean | no | Adjust for rights issues. Default `false` |
+| `adjust_dividends` | boolean | no | Adjust for cash dividends (total-return series). Default `false` |
+| `limit` | number | no | Max trading days returned, most recent first. Default 50, max 500 |
+| `offset` | number | no | Skip this many of the most recent trading days — use to page further back |
 
 Returns CSV: `date,open,high,low,close,volume`
 
@@ -75,6 +80,15 @@ A bare symbol/name for a company with multiple listed instruments (voting,
 non-voting, rights, debentures, preferential — distinguished by ticker suffix)
 defaults to the voting instrument; the response note lists the others. Give an
 explicit suffix (e.g. `SAMP.X0000`) to pick a specific one.
+
+Defaults to the most recent 50 trading days if no `from`/`to` is given. If
+more history is available, the response note says so and how to page further
+back with `offset`. The response note also lists any corporate actions
+(splits/rights/dividends) that fall within the returned range, regardless of
+whether the corresponding `adjust_*` flag was on — e.g. *"Prices are adjusted
+for: splits. Corporate actions in this range: 2026-04-30 split (price
+×0.1000, applied); 2026-06-03 dividend (price ×0.9900, not applied — raw
+price shown)."*
 
 ### `get_financials`
 
@@ -147,6 +161,70 @@ Returns CSV: `date,open,high,low,close,change,change_pct,sector_turnover,sector_
 Headline indices (ASPI, S&P SL20) populate `open`/`high`/`low`/`close`; industry
 sub-indices instead populate `sector_turnover`/`sector_volume`/`sector_trades` and
 leave `high`/`low` empty.
+
+### `get_technicals`
+
+Pre-computed daily technicals (moving averages, relative-strength rating,
+52-week range, volume anomalies) for a CSE stock **or** a sector/headline
+index — one tool for both.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbol` | string | yes | Ticker, company name, index symbol/name/abbreviation, or typo of any |
+| `from` | string (`YYYY-MM-DD`) | no | Optional date bound |
+| `to` | string (`YYYY-MM-DD`) | no | Optional date bound |
+| `limit` | number | no | Max trading days returned, most recent first. Default 50, max 500 |
+| `offset` | number | no | Skip this many of the most recent trading days — use to page further back |
+
+Returns CSV, one row per trading day (most recent last):
+`date,close,change_pct,volume,vol_sma10,vol_sma20,vol_sma50,vol_vs_sma50_pct,sma10,ema21,ema50,ema200,high_52w,low_52w,is_52w_high,is_52w_low,is_hve,is_hv1,is_hvytd,rs_line,rs_rating`
+
+Defaults to the most recent 50 trading days; if more history is available,
+the response note says so and how to page further back with `offset`.
+
+### `screen_stocks`
+
+Screen CSE stocks by pre-computed technical criteria. Every filter is
+optional and AND-combined — omit a filter to not constrain on it.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `above_sma10` / `above_ema21` / `above_ema50` / `above_ema200` | boolean | no | Price above/below that moving average |
+| `rs_rating_min` / `rs_rating_max` | number | no | Relative-strength rating, 1-99 |
+| `change_pct_min` / `change_pct_max` | number | no | Today's percent change |
+| `is_52w_high` / `is_52w_low` | boolean | no | At a 52-week high/low today |
+| `is_hve` / `is_hv1` / `is_hvytd` | boolean | no | Highest volume ever / past 252 trading days / year-to-date |
+| `vol_vs_sma50_pct_min` / `vol_vs_sma50_pct_max` | number | no | Volume vs. 50-day average, as a percent (`100` = 2x average) |
+| `sector` | string | no | Substring filter against company sector |
+| `date` | string (`YYYY-MM-DD`) | no | Defaults to the latest available trading date |
+| `sort` | `"rs_rating"` \| `"change_pct"` \| `"vol_vs_sma50_pct"` \| `"close"` | no | Default `rs_rating` |
+| `order` | `"asc"` \| `"desc"` | no | Default `desc` |
+| `limit` | number | no | Default 20, max 100 |
+
+Returns CSV, one row per matching stock. Example: `above_ema50=true,
+above_ema200=true, rs_rating_min=80` finds market-leading uptrends;
+`is_52w_high=true` finds stocks making new highs today;
+`vol_vs_sma50_pct_min=100` finds stocks trading at 2x+ their average volume.
+
+### `screen_indices`
+
+Screen CSE sector/headline indices by the same trend criteria as
+`screen_stocks` — moving-average position and relative-strength rating. No
+52-week-range or volume filters (not tracked for indices). Use this to find
+which sectors are in a sustained uptrend/downtrend, as distinct from
+`get_indices`/`get_index_data`, which show a single day's performance.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `above_sma10` / `above_ema21` / `above_ema50` / `above_ema200` | boolean | no | Price above/below that moving average |
+| `rs_rating_min` / `rs_rating_max` | number | no | Relative-strength rating, 1-99 |
+| `change_pct_min` / `change_pct_max` | number | no | Today's percent change |
+| `date` | string (`YYYY-MM-DD`) | no | Defaults to the latest available trading date |
+| `sort` | `"rs_rating"` \| `"change_pct"` \| `"close"` | no | Default `rs_rating` |
+| `order` | `"asc"` \| `"desc"` | no | Default `desc` |
+| `limit` | number | no | Default 20, max 100 |
+
+Returns CSV, one row per matching index.
 
 ## Example Call
 

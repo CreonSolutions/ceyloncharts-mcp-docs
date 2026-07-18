@@ -35,3 +35,18 @@ echo "== ASPI index data (Jan 2025, CSV) =="
 curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
   "$BASE_URL/v1/indices/ASPI/data?from=2025-01-01&to=2025-01-31&format=csv"
 echo
+
+echo "== Technicals for SAMP (last 20 trading days) =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/technicals/SAMP?limit=20"
+echo
+
+echo "== Screen stocks: uptrend + RS rating >= 80 =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/screener/stocks?above_ema50=true&above_ema200=true&rs_rating_min=80"
+echo
+
+echo "== Screen indices sorted by relative strength =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/screener/indices?sort=rs_rating&order=desc&limit=10"
+echo

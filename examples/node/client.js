@@ -36,6 +36,20 @@ async function getIndexData(index, { from, to } = {}) {
   return res.json();
 }
 
+async function getTechnicals(symbol, { limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit, offset });
+  const res = await fetch(`${BASE_URL}/v1/technicals/${symbol}?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function screenStocks(filters = {}) {
+  const params = new URLSearchParams(filters);
+  const res = await fetch(`${BASE_URL}/v1/screener/stocks?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 async function main() {
   const symbols = await getSymbols();
   console.log(symbols.slice(0, 5));
@@ -45,6 +59,12 @@ async function main() {
 
   const indexData = await getIndexData("ASPI", { from: "2025-01-01", to: "2025-01-31" });
   console.log(indexData);
+
+  const technicals = await getTechnicals("SAMP", { limit: 20 });
+  console.log(technicals);
+
+  const leaders = await screenStocks({ above_ema50: "true", above_ema200: "true", rs_rating_min: "80" });
+  console.log(leaders);
 }
 
 main().catch((err) => {
