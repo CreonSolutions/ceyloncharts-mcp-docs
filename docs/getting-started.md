@@ -14,7 +14,7 @@ OAuth — no bridge or local process required.
 2. Complete the OAuth login flow when prompted. This authenticates you as a
    CeylonCharts user and issues a scoped, short-lived access token — your client
    handles token storage and refresh automatically.
-3. The eleven tools listed in [mcp-tools.md](mcp-tools.md) will appear as available
+3. The twelve tools listed in [mcp-tools.md](mcp-tools.md) will appear as available
    tools once connected.
 
 ## Option 2 — Claude Desktop (stdio clients)

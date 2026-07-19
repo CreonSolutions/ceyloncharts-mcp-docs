@@ -19,7 +19,7 @@ endpoints. It does not contain the server's source code.
 ## Contents
 
 - [Getting Started](docs/getting-started.md) — connect from Claude.ai, Claude Desktop, or plain HTTP
-- [MCP Tools Reference](docs/mcp-tools.md) — the eleven tools exposed over MCP
+- [MCP Tools Reference](docs/mcp-tools.md) — the twelve tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
@@ -40,6 +40,7 @@ endpoints. It does not contain the server's source code.
 | `get_technicals` | Pre-computed daily technicals (moving averages, RS rating, 52-week range) for a stock or index |
 | `screen_stocks` | Screen CSE stocks by technical criteria (trend, RS rating, 52-week range, volume) |
 | `screen_indices` | Screen sector/headline indices by trend and RS rating |
+| `get_market_summary` | Daily/weekly/monthly market overview: top gainers/losers, activity leaders, index/sector performance |
 
 See [docs/mcp-tools.md](docs/mcp-tools.md) for full input/output shapes.
 

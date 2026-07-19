@@ -86,9 +86,19 @@ def screen_indices(**filters) -> dict:
     return resp.json()
 
 
+def get_market_summary(period: str = "daily", date: str | None = None, limit: int = 5) -> dict:
+    params = {"period": period, "limit": limit}
+    if date:
+        params["date"] = date
+    resp = requests.get(f"{BASE_URL}/v1/market-summary", headers=_headers(), params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+
 if __name__ == "__main__":
     print(get_symbols()[:5])
     print(get_ohlc("SAMP", from_date="2025-01-01", to_date="2025-01-31"))
     print(get_index_data("ASPI", from_date="2025-01-01", to_date="2025-01-31"))
     print(get_technicals("SAMP", limit=20))
     print(screen_stocks(above_ema50="true", above_ema200="true", rs_rating_min=80))
+    print(get_market_summary(period="weekly"))

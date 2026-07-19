@@ -234,6 +234,27 @@ are in the row) but keep `is_52w_high`/`is_52w_low`/`is_hve`/`is_hv1`/`is_hvytd`
 
 Shares the [pagination model](#pagination-ohlc-and-technicals) with OHLC.
 
+## Market Summary
+
+`GET /v1/market-summary` is a market-wide daily/weekly/monthly overview: top
+gainers/losers, top by volume/turnover/crossings, ASI and S&P SL20
+performance, and top/bottom performing sectors — everything you'd want for
+"what happened in the market today/this week/this month" in one call.
+
+A weekly or monthly summary requested mid-period covers what's happened **so
+far** (e.g. Monday through today for a weekly summary requested on a
+Wednesday) — not a wait for the period to finish, and not the prior complete
+period. The response's `meta.isPartialPeriod` says which case applies.
+
+Unlike other endpoints, this one doesn't support `?format=csv` — the response
+is a bundle of several small named lists (movers, activity leaders, indices,
+sectors), not one homogeneous table, so there's no single CSV shape that
+fits.
+
+It's also the one cached endpoint whose cache isn't scoped per user — the
+content doesn't vary by caller (it's market-wide, not personalized), so every
+caller shares the same cached response for a given `period`/`date`/`limit`.
+
 ## CSV Response Format
 
 Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
@@ -241,7 +262,8 @@ Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
 `/v1/macro/data`, `/v1/indices`, `/v1/indices/:index/data`,
 `/v1/screener/stocks`, `/v1/screener/indices`, `/v1/technicals/:symbol`)
 accepts `?format=csv` as an alternative to the default JSON envelope. JSON
-stays the default.
+stays the default. `/v1/market-summary` is the one exception — see
+[Market Summary](#market-summary).
 
 ```
 Content-Type: text/csv; charset=utf-8
@@ -457,8 +479,55 @@ Response row fields: `date`, `close`, `change_pct`, `volume`, `vol_sma10`,
 `ema200`, `high_52w`, `low_52w`, `is_52w_high`, `is_52w_low`, `is_hve`,
 `is_hv1`, `is_hvytd`, `rs_line`, `rs_rating`.
 
+### `GET /v1/market-summary`
+
+Market-wide overview for a daily/weekly/monthly window — see
+[Market Summary](#market-summary) for the period-to-date semantics and why
+this endpoint doesn't support `?format=csv`.
+
+Query params: `period` (`daily` | `weekly` | `monthly`, default `daily`),
+`date` (`YYYY-MM-DD`, optional — defaults to the latest trading date; for
+weekly/monthly, any date within the target period), `limit` (max entries per
+list, default 5, max 20).
+
+```json
+{
+  "meta": {
+    "period": "weekly",
+    "periodStart": "2026-07-13",
+    "periodEnd": "2026-07-16",
+    "baselineDate": "2026-07-10",
+    "isPartialPeriod": true,
+    "limit": 5
+  },
+  "indices": [
+    { "symbol": "ASI", "name": "ALL SHARE PRICE INDEX", "startClose": 12000, "endClose": 12150, "changePct": 1.25 }
+  ],
+  "topGainers": [
+    { "symbol": "SAMP.N0000", "name": "Sampath Bank PLC", "startClose": 100, "endClose": 110, "changePct": 10 }
+  ],
+  "topLosers": [ ],
+  "topVolume": [
+    { "symbol": "COMB.N0000", "name": "Commercial Bank of Ceylon PLC", "totalVolume": 500000, "totalTurnover": 50000000, "totalCrossVolume": 10000, "totalCrossTrades": 3 }
+  ],
+  "topTurnover": [ ],
+  "topCrossings": [ ],
+  "topSectors": [
+    { "symbol": "EGY", "name": "Energy", "startClose": 1000, "endClose": 1080, "changePct": 8 }
+  ],
+  "bottomSectors": [ ]
+}
+```
+
+`indices` lists ASI/S&P SL20 performance (never ranked against sectors — a
+headline index is a weighted average across every sub-sector, not a peer of
+its own components). Returns `404` if there's no market data on or before
+the reference date at all.
+
 ## Caching
 
 `GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials`,
-`/v1/announcements`, `/v1/indices`, `/v1/screener`, and `/v1/technicals` are
-cached for up to 5 minutes.
+`/v1/announcements`, `/v1/indices`, `/v1/screener`, `/v1/technicals`, and
+`/v1/market-summary` are cached for up to 5 minutes. `/v1/market-summary`'s
+cache is shared across all callers rather than scoped per user — see
+[Market Summary](#market-summary).

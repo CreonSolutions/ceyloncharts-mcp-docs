@@ -50,6 +50,14 @@ async function screenStocks(filters = {}) {
   return res.json();
 }
 
+async function getMarketSummary({ period = "daily", date, limit = 5 } = {}) {
+  const params = new URLSearchParams({ period, limit });
+  if (date) params.set("date", date);
+  const res = await fetch(`${BASE_URL}/v1/market-summary?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 async function main() {
   const symbols = await getSymbols();
   console.log(symbols.slice(0, 5));
@@ -65,6 +73,9 @@ async function main() {
 
   const leaders = await screenStocks({ above_ema50: "true", above_ema200: "true", rs_rating_min: "80" });
   console.log(leaders);
+
+  const summary = await getMarketSummary({ period: "weekly" });
+  console.log(summary);
 }
 
 main().catch((err) => {

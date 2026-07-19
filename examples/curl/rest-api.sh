@@ -50,3 +50,8 @@ echo "== Screen indices sorted by relative strength =="
 curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
   "$BASE_URL/v1/screener/indices?sort=rs_rating&order=desc&limit=10"
 echo
+
+echo "== Weekly market summary =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/market-summary?period=weekly&limit=5"
+echo

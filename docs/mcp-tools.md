@@ -226,6 +226,26 @@ which sectors are in a sustained uptrend/downtrend, as distinct from
 
 Returns CSV, one row per matching index.
 
+### `get_market_summary`
+
+Market-wide daily/weekly/monthly overview: top gainers/losers, top by
+volume/turnover/crossings, ASI and S&P SL20 performance, and top/bottom
+performing sectors.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `period` | `"daily"` \| `"weekly"` \| `"monthly"` | no | Default `daily` |
+| `date` | string (`YYYY-MM-DD`) | no | Reference date, defaults to the latest trading date. For weekly/monthly, any date within the target period |
+| `limit` | number | no | Max entries per list (gainers, losers, volume, turnover, crossings, top/bottom sectors). Default 5, max 20 |
+
+Returns JSON, not CSV — the response is a bundle of several small named
+lists, not one table.
+
+A weekly or monthly summary requested mid-period covers what's happened
+**so far** (e.g. Monday through today for a weekly summary requested on a
+Wednesday) — not a wait for the period to finish, and not the prior complete
+period. The response's `isPartialPeriod` field says which case applies.
+
 ## Example Call
 
 ```json
