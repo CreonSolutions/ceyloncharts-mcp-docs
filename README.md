@@ -18,12 +18,13 @@ endpoints. It does not contain the server's source code.
 
 ## Contents
 
-- [Getting Started](docs/getting-started.md) — connect from Claude.ai, Claude Desktop, or plain HTTP
+- [Getting Started](docs/getting-started.md) — connect from Claude Web, ChatGPT, Antigravity, Claude Desktop, or plain HTTP
 - [MCP Tools Reference](docs/mcp-tools.md) — the twelve tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
 - [Examples](examples/) — runnable curl, Python, and Node snippets
+- [AGENTS.md](AGENTS.md) / [SKILL.md](SKILL.md) — condensed reference for coding agents (base URLs, auth, gotchas, endpoint table)
 
 ## Available MCP Tools
 
@@ -54,8 +55,17 @@ curl -H "X-User-Id: <your-user-id>" \
 
 ## Getting Access
 
-API keys are issued on request rather than via self-service signup — see
-[docs/authentication.md](docs/authentication.md) for how to request one.
+API keys are self-service from your CeylonCharts account — see
+[docs/authentication.md](docs/authentication.md) for how to generate one.
+
+## For Coding Agents
+
+[AGENTS.md](AGENTS.md) and [SKILL.md](SKILL.md) hold the same condensed
+reference (base URLs, auth, common gotchas, an endpoint/tool table) in two
+formats — `AGENTS.md` for the general cross-tool convention, `SKILL.md` with
+Claude Skill frontmatter. If you're working in Claude Code and want it
+auto-discovered as a skill in your own project, copy `SKILL.md` to
+`.claude/skills/ceyloncharts-mcp/SKILL.md` there.
 
 ## License
 
