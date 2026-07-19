@@ -7,7 +7,7 @@ There are five ways to use the CeylonCharts MCP Server, depending on your client
 Claude.ai and other browser-based MCP clients can connect directly over HTTP using
 OAuth — no bridge or local process required.
 
-1. In Claude.ai, click **Customize** in the left sidebar → **Connectors** → **+**
+1. In Claude.ai, click **Profile** in the left sidebar then **Settings** → **Connectors** → **+**
    → **Add custom connector**, and enter the server URL:
    ```
    https://mcp.ceyloncharts.com/mcp/
