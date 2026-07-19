@@ -6,6 +6,10 @@ function headers() {
   return {
     "X-User-Id": process.env.CEYLONCHARTS_USER_ID,
     "X-Api-Key": process.env.CEYLONCHARTS_API_KEY,
+    // Cloudflare's bot protection in front of this domain blocks some HTTP
+    // clients' default User-Agent outright before the request reaches the
+    // API — see rest-api.md. Set your own to be safe.
+    "User-Agent": "CeylonChartsExampleClient/1.0",
   };
 }
 

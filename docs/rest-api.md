@@ -16,6 +16,23 @@ All endpoints below except `/health` require:
 Missing or invalid credentials return `401 Unauthorized`. See
 [authentication.md](authentication.md) for how to obtain these.
 
+### Set a real `User-Agent`
+
+Independently of API-key auth, Cloudflare's bot protection in front of this
+domain blocks some HTTP clients' **default** `User-Agent` string outright
+(e.g. Python's `urllib` sends `Python-urllib/3.x`, which gets a `1010` error)
+— this happens before your request ever reaches the API, so a valid
+`X-User-Id`/`X-Api-Key` won't help. curl's default UA is not blocked, but
+don't rely on that; set an explicit, descriptive `User-Agent` header from
+whatever client you use, e.g.:
+
+```
+User-Agent: MyApp/1.0 (contact@example.com)
+```
+
+If you get a blocked/challenge response instead of JSON, this is the first
+thing to check.
+
 ## Rate Limiting
 
 Enforced per user, per hour, based on your plan — see [rate-limits.md](rate-limits.md).

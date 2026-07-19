@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # CeylonCharts REST API — curl examples
+#
+# curl's default User-Agent isn't blocked by Cloudflare's bot protection on
+# this domain, unlike some other HTTP clients (e.g. Python's urllib) — see
+# "Set a real User-Agent" in docs/rest-api.md. If you swap these calls for
+# another tool/language, set an explicit User-Agent header.
+#
 # Set these before running:
 export USER_ID="<your-user-id>"
 export API_KEY="<your-api-key>"

@@ -12,6 +12,11 @@ def _headers() -> dict:
     return {
         "X-User-Id": os.environ["CEYLONCHARTS_USER_ID"],
         "X-Api-Key": os.environ["CEYLONCHARTS_API_KEY"],
+        # Cloudflare's bot protection in front of this domain blocks some
+        # HTTP clients' default User-Agent outright (e.g. urllib's) before
+        # the request even reaches the API — see rest-api.md. `requests`'
+        # default UA is usually fine, but set your own to be safe.
+        "User-Agent": "CeylonChartsExampleClient/1.0",
     }
 
 

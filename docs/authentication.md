@@ -18,12 +18,21 @@ curl -H "X-User-Id: <your-user-id>" \
 Only a salted hash of your key is ever stored server-side — the plaintext key is
 shown once, at creation time, and cannot be retrieved again if lost.
 
-**Requesting a key**: API keys are currently provisioned by request rather than
-self-service signup. Visit https://www.ceyloncharts.com to get an account and key
-created for you.
+**Getting a key**: keys are self-service from your CeylonCharts account:
 
-**Losing a key**: if a key is compromised or lost, get it
-revoked and reissued through https://www.ceyloncharts.com — revoked keys stop working immediately.
+1. Sign in at [ceyloncharts.com](https://www.ceyloncharts.com).
+2. Open your profile menu → **Profile Settings** → the **Developer** tab.
+3. Click **Generate API Key**. Your `X-User-Id` and `X-Api-Key` are shown once —
+   copy both immediately, since the key can't be retrieved again afterward.
+
+**Regenerating a key**: if you lose your key (rather than it being compromised),
+go back to the **Developer** tab and click **Regenerate key**. This immediately
+invalidates the previous key and issues a new one — update any callers using the
+old key before doing this, since there's no overlap window.
+
+**Revoking a key**: if a key is compromised, click **Revoke** in the same tab to
+disable it immediately without issuing a replacement. Generate a new key
+separately once you're ready.
 
 ## OAuth (Claude.ai / browser MCP clients)
 
