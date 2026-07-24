@@ -7,7 +7,8 @@ for exact request/response shapes; this file is for orientation and gotchas.
 ## What this is
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history,
-financials, announcements, market/sector indices, pre-computed technicals, a
+financial statements, general announcements, a corporate-actions calendar
+(dividends/rights/splits), market/sector indices, pre-computed technicals, a
 screener, and a market summary — as a REST API and an MCP server. Both are
 Cloudflare Workers behind the same custom domain.
 
@@ -49,17 +50,34 @@ Two independent auth schemes, pick one per how you're connecting — see
    of repeating field names per row, ~3x smaller for typical OHLCV data. Meta
    fields move to `X-Resolved-*`/`X-Has-More`/etc. response headers instead
    of a JSON `meta` object. See [docs/rest-api.md](docs/rest-api.md#csv-response-format).
-4. **OHLC and technicals default to the last 50 trading days**, not full
-   history — `limit` (max 500) / `offset` control paging, and the response
-   says `hasMore`/`nextOffset` when there's more. Don't assume you got
-   everything back from a wide `from`/`to` range. See
-   [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-and-technicals).
-5. **`get_market_summary` / `GET /v1/market-summary` is the one exception**
-   to several rules above: JSON only (no CSV — it's a bundle of several
-   small lists, not one table), and its cache is shared across all callers
-   rather than scoped per user. See
-   [docs/rest-api.md](docs/rest-api.md#market-summary).
-6. **Google Antigravity's MCP OAuth support is currently unreliable** for
+4. **OHLC, technicals, and corporate actions default to a capped page**, not
+   full history — OHLC/technicals default to the last 50 trading days;
+   corporate actions has no date default at all but is still `limit`/`offset`
+   paginated (default 50). `limit` (max 500) / `offset` control paging, and
+   the response says `hasMore`/`nextOffset` when there's more. Don't assume
+   you got everything back from a wide `from`/`to` range. See
+   [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-technicals-and-corporate-actions).
+5. **`get_market_summary` and `get_corporate_actions` are the two exceptions**
+   to normal caching — both are cached but the cache is shared across all
+   callers rather than scoped per user, since the content isn't personalized.
+   `get_market_summary` additionally has no CSV mode at all (JSON only — it's
+   a bundle of several small lists, not one table). See
+   [docs/rest-api.md](docs/rest-api.md#market-summary) and
+   [docs/rest-api.md](docs/rest-api.md#corporate-actions).
+6. **`get_financials` (compact multi-quarter trend) is currently disabled**
+   as an MCP tool in favor of `get_financial_statement` (full line-item
+   detail for one statement type). The REST endpoint
+   (`GET /v1/financials/:symbol`) is still live if you need the compact
+   trend — just not exposed as an MCP tool right now. Don't confuse it with
+   `get_financial_statement`'s `GET /v1/financials/:symbol/statement` — see
+   [docs/rest-api.md](docs/rest-api.md#financial-statements).
+7. **Three endpoints look similar but aren't**: `get_corporate_actions`
+   (structured dividends/rights/splits calendar) vs. OHLC's adjustment
+   events (minimal, just explains a price move) vs. `get_announcements`
+   (general disclosures — board changes, AGM/EGM, suspensions — free-text
+   only). Pick based on what you actually need. See
+   [docs/rest-api.md](docs/rest-api.md#corporate-actions).
+8. **Google Antigravity's MCP OAuth support is currently unreliable** for
    this server (some users hit `401` even after authenticating) — there's no
    static-token fallback, since `/mcp/` only accepts OAuth bearer tokens. Use
    Claude Web, Claude Desktop, or ChatGPT instead if you hit this. See
@@ -71,8 +89,10 @@ Two independent auth schemes, pick one per how you're connecting — see
 |---|---|---|
 | `GET /v1/symbols` | `get_symbols` | `q`/`sector` substring filters |
 | `GET /v1/ohlc/:symbol` | `get_ohlc_data` | adjustments + pagination, see gotcha 4 |
-| `GET /v1/financials/:symbol` | `get_financials` | quarterly, 365-day default window |
-| `GET /v1/announcements/:symbol` | `get_announcements` | 365-day default window |
+| `GET /v1/financials/:symbol` | *(none — see gotcha 6)* | compact multi-quarter trend |
+| `GET /v1/financials/:symbol/statement` | `get_financial_statement` | full statement detail, see gotcha 6 |
+| `GET /v1/announcements/:symbol` | `get_announcements` | general disclosures, 365-day default window |
+| `GET /v1/corporate-actions` | `get_corporate_actions` | dividends/rights/splits, see gotcha 7 |
 | `GET /v1/macro/series` | `get_macro_series` | |
 | `GET /v1/macro/data` | `get_macro_data` | |
 | `GET /v1/indices` | `get_indices` | ASPI, S&P SL20, sub-indices |
@@ -87,7 +107,7 @@ Full param/response shapes: [docs/rest-api.md](docs/rest-api.md) (REST),
 
 ## Rate limits
 
-Per-user, per-hour: free 100, pro 1000, business 10000. See
+Per-user, per-hour: basic 100, pro 1000, business 10000. See
 [docs/rate-limits.md](docs/rate-limits.md).
 
 ## Runnable examples

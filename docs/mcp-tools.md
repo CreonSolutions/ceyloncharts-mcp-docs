@@ -90,21 +90,36 @@ for: splits. Corporate actions in this range: 2026-04-30 split (price
 ×0.1000, applied); 2026-06-03 dividend (price ×0.9900, not applied — raw
 price shown)."*
 
-### `get_financials`
+### `get_financial_statement`
 
-Quarterly financial statement data.
+Full line-item detail for one financial statement (income statement, balance
+sheet, or cash flow statement) — every quarter available, one row per line
+item. Statements are entity-level (any instrument suffix is ignored).
 
 | Argument | Type | Required | Notes |
 |----------|------|----------|-------|
 | `symbol` | string | yes | Ticker or company name |
-| `from` | string (`YYYY-MM-DD`) | no | Defaults to 365 days before `to` |
-| `to` | string (`YYYY-MM-DD`) | no | Defaults to today |
+| `statement` | `"income"` \| `"balance"` \| `"cashflow"` | yes | Which statement to fetch |
+| `company_type` | `"group"` \| `"company"` | no | Most companies only publish `group` (consolidated). Omit to try `group` then fall back to `company` automatically; pass explicitly to force one variant with no fallback |
 
-Returns CSV: `period,revenue,net_income,eps,total_assets,total_equity`
+Returns CSV: `label,canonical_key,<one column per fiscal period>` (most
+recent period first).
+
+**Cash-flow figures are cumulative (year-to-date), while income-statement
+figures are per-quarter** — don't diff adjacent cash-flow columns as if they
+were quarterly deltas.
+
+> **Note**: `get_financials` (the compact multi-quarter revenue/income/EPS
+> trend) is currently disabled on the hosted server in favor of this tool —
+> if you need the older compact-trend shape, call
+> `GET /v1/financials/:symbol` directly over REST instead (still live, just
+> not exposed as an MCP tool right now). See
+> [rest-api.md](rest-api.md#financial-statements).
 
 ### `get_announcements`
 
-Corporate announcements (dividends, rights, board changes, etc.).
+General CSE disclosures (board changes, AGM/EGM notices, listings, trading
+suspensions/resumptions, name changes, etc.).
 
 | Argument | Type | Required | Notes |
 |----------|------|----------|-------|
@@ -113,6 +128,11 @@ Corporate announcements (dividends, rights, board changes, etc.).
 | `to` | string (`YYYY-MM-DD`) | no | Defaults to today |
 
 Returns CSV: `date,type,description,pdf_url`
+
+**For dividends, rights issues, or share splits specifically, use
+[`get_corporate_actions`](#get_corporate_actions) instead** — this tool's
+`description` field is free text; `get_corporate_actions` has structured
+amounts/ratios/ex-dates.
 
 ### `get_macro_series`
 
@@ -245,6 +265,26 @@ A weekly or monthly summary requested mid-period covers what's happened
 **so far** (e.g. Monday through today for a weekly summary requested on a
 Wednesday) — not a wait for the period to finish, and not the prior complete
 period. The response's `isPartialPeriod` field says which case applies.
+
+### `get_corporate_actions`
+
+Calendar of corporate actions (dividends, rights issues, share splits) —
+announcement detail (amounts, ratios, ex-dates), not just a price-adjustment
+factor. This is the tool for dividends/rights/splits specifically; for other
+company disclosures, use `get_announcements` instead.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbol` | string | no | Ticker or company name — matches every share class of that company. Omit for a market-wide calendar |
+| `kind` | `"split"` \| `"rights"` \| `"dividend"` | no | Restrict to one kind |
+| `from` | string (`YYYY-MM-DD`) | no | No default lower bound — omit for the full dataset |
+| `to` | string (`YYYY-MM-DD`) | no | No default upper bound |
+| `limit` | number | no | Max entries returned, oldest first. Default 50, max 500 |
+| `offset` | number | no | Skip this many of the earliest matching entries — use to page further in |
+
+Returns CSV, one row per action. Omit all filters to browse everything past
+and future, oldest first; pass `from=<today>` to jump straight to upcoming
+ones, which is the most common need.
 
 ## Example Call
 

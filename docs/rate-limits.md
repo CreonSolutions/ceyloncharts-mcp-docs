@@ -4,7 +4,7 @@ Limits are enforced per user, per rolling one-hour window, based on your account
 
 | Plan | Requests/hour |
 |------|---------------|
-| Free | 100 |
+| Basic | 100 |
 | Pro | 1,000 |
 | Business | 10,000 |
 
@@ -35,4 +35,6 @@ retry).
   same bucket.
 - Cached `GET` responses (see [rest-api.md](rest-api.md#caching)) still count
   against your limit.
-- Need a higher limit? Visit https://www.ceyloncharts.com to upgrade your plan.
+- Need a higher limit? Visit https://www.ceyloncharts.com to upgrade your plan
+  — the new limit applies immediately to your existing API key, no need to
+  regenerate it.

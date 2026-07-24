@@ -5,8 +5,9 @@
 # CeylonCharts MCP Server
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history (with
-corporate-action adjustments), financial statements, corporate announcements,
-market/sector indices, pre-computed technicals, a market screener, and
+corporate-action adjustments), full financial statements, corporate
+announcements, a corporate-actions calendar, market/sector indices,
+pre-computed technicals, a market screener, market summaries, and
 macroeconomic indicators — available as:
 
 - A **REST API** (`https://mcp.ceyloncharts.com/api`)
@@ -19,7 +20,7 @@ endpoints. It does not contain the server's source code.
 ## Contents
 
 - [Getting Started](docs/getting-started.md) — connect from Claude Web, ChatGPT, Antigravity, Claude Desktop, or plain HTTP
-- [MCP Tools Reference](docs/mcp-tools.md) — the twelve tools exposed over MCP
+- [MCP Tools Reference](docs/mcp-tools.md) — the thirteen tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
@@ -32,8 +33,9 @@ endpoints. It does not contain the server's source code.
 |------|-------------|
 | `get_symbols` | List/search CSE-listed companies |
 | `get_ohlc_data` | Daily/weekly/monthly OHLC price history |
-| `get_financials` | Quarterly financial statement data |
-| `get_announcements` | Corporate announcements/filings |
+| `get_financial_statement` | Full income statement, balance sheet, or cash flow statement detail |
+| `get_announcements` | General CSE disclosures (board changes, AGM/EGM, suspensions, etc.) |
+| `get_corporate_actions` | Corporate-actions calendar: dividends, rights issues, share splits |
 | `get_macro_series` | List available macroeconomic series |
 | `get_macro_data` | Macroeconomic indicator data |
 | `get_indices` | List CSE market/sector indices (ASPI, S&P SL20, industry sub-indices) |
@@ -42,6 +44,11 @@ endpoints. It does not contain the server's source code.
 | `screen_stocks` | Screen CSE stocks by technical criteria (trend, RS rating, 52-week range, volume) |
 | `screen_indices` | Screen sector/headline indices by trend and RS rating |
 | `get_market_summary` | Daily/weekly/monthly market overview: top gainers/losers, activity leaders, index/sector performance |
+
+> `get_financials` (compact multi-quarter revenue/income/EPS trend) is
+> currently disabled as an MCP tool in favor of `get_financial_statement` —
+> the underlying `GET /v1/financials/:symbol` REST endpoint is still live,
+> see [docs/rest-api.md](docs/rest-api.md#financial-statements).
 
 See [docs/mcp-tools.md](docs/mcp-tools.md) for full input/output shapes.
 

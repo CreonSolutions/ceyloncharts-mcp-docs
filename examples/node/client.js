@@ -62,6 +62,29 @@ async function getMarketSummary({ period = "daily", date, limit = 5 } = {}) {
   return res.json();
 }
 
+// statement: "income" | "balance" | "cashflow". Requests CSV for readability
+// (one column per fiscal period); omit format=csv for the JSON envelope.
+async function getFinancialStatement(symbol, statement, { companyType } = {}) {
+  const params = new URLSearchParams({ statement, format: "csv" });
+  if (companyType) params.set("company_type", companyType);
+  const res = await fetch(`${BASE_URL}/v1/financials/${symbol}/statement?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.text();
+}
+
+// kind: "split" | "rights" | "dividend". Omit symbol for a market-wide
+// calendar; omit from/to for the full dataset (no default window).
+async function getCorporateActions({ symbol, kind, from, to, limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit, offset });
+  if (symbol) params.set("symbol", symbol);
+  if (kind) params.set("kind", kind);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const res = await fetch(`${BASE_URL}/v1/corporate-actions?${params}`, { headers: headers() });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 async function main() {
   const symbols = await getSymbols();
   console.log(symbols.slice(0, 5));
@@ -80,6 +103,12 @@ async function main() {
 
   const summary = await getMarketSummary({ period: "weekly" });
   console.log(summary);
+
+  const statement = await getFinancialStatement("SAMP", "income");
+  console.log(statement.slice(0, 500));
+
+  const actions = await getCorporateActions({ from: "2026-01-01", kind: "dividend" });
+  console.log(actions);
 }
 
 main().catch((err) => {

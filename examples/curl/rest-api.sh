@@ -61,3 +61,13 @@ echo "== Weekly market summary =="
 curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
   "$BASE_URL/v1/market-summary?period=weekly&limit=5"
 echo
+
+echo "== SAMP income statement (CSV) =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/financials/SAMP/statement?statement=income&format=csv"
+echo
+
+echo "== Upcoming corporate actions (dividends/rights/splits) =="
+curl -s -H "X-User-Id: $USER_ID" -H "X-Api-Key: $API_KEY" \
+  "$BASE_URL/v1/corporate-actions?from=$(date +%F)&limit=20"
+echo

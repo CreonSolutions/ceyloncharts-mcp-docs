@@ -145,6 +145,36 @@ CSE market/sector indices come in two shapes, distinguished by `is_main_index`:
 `price_index`, `per`, `pbv`, `dy`, `companies_traded`, `companies_listed` are
 carried through as-is from the source data and may be null on either shape.
 
+## Financial Statements
+
+`GET /v1/financials/:symbol` (compact multi-quarter trend) and
+`GET /v1/financials/:symbol/statement` (full line-item detail for one
+statement) serve different purposes — the same relationship as
+`/v1/announcements/:symbol` vs. `/v1/corporate-actions` below:
+
+| | `/v1/financials/:symbol` | `/v1/financials/:symbol/statement` |
+|---|---|---|
+| Purpose | Compact revenue/income/EPS trend across quarters | Full detail for one statement type |
+| Shape | One row per quarter, fixed columns | One row per line item, one column per fiscal period |
+| Statement types | N/A (summary fields only) | `income`, `balance`, or `cashflow` — pick one via `statement` |
+
+`/statement` is entity-level, not per-share-class — it always resolves to the
+voting-shares (`.N0000`) instrument regardless of which instrument the input
+named. Most companies only publish a `group` (consolidated) statement, so
+`company_type` defaults to trying `group` first and falling back to `company`
+(standalone) automatically; pass it explicitly to force one variant with no
+fallback. The response says which variant was actually served (`companyType`
+in JSON, `X-Company-Type` header in CSV) since it may differ from what was
+requested.
+
+**Cash-flow figures are cumulative (year-to-date), while income-statement
+figures are per-quarter** — don't diff adjacent cash-flow columns as if they
+were quarterly deltas.
+
+If the symbol is known but the statement hasn't been extracted yet, the
+response is `404` with `"Financial data extraction under progress"` —
+distinct from the standard "symbol not found" 404 for an unknown symbol.
+
 ## Corporate Action Adjustments (OHLC only)
 
 `GET /v1/ohlc/:symbol` can adjust historical prices for corporate actions so
@@ -172,10 +202,11 @@ dipped, rather than mistaking it for noise:
   and `X-Adjustment-Events` header (`date:kind:factor:adjusted` quads joined by
   `;`).
 
-## Pagination (OHLC and Technicals)
+## Pagination (OHLC, Technicals, and Corporate Actions)
 
-`GET /v1/ohlc/:symbol` and `GET /v1/technicals/:symbol` share the same
-pagination model. Three params control the window:
+`GET /v1/ohlc/:symbol`, `GET /v1/technicals/:symbol`, and
+`GET /v1/corporate-actions` share the same pagination model. Three params
+control the window:
 
 | Param | Default | Meaning |
 |-------|---------|---------|
@@ -249,7 +280,7 @@ Row fields omit `above_sma10`/`above_ema21`/`above_ema50`/`above_ema200`
 are in the row) but keep `is_52w_high`/`is_52w_low`/`is_hve`/`is_hv1`/`is_hvytd`
 (not derivable from anything else in the row).
 
-Shares the [pagination model](#pagination-ohlc-and-technicals) with OHLC.
+Shares the [pagination model](#pagination-ohlc-technicals-and-corporate-actions) with OHLC.
 
 ## Market Summary
 
@@ -268,16 +299,45 @@ is a bundle of several small named lists (movers, activity leaders, indices,
 sectors), not one homogeneous table, so there's no single CSV shape that
 fits.
 
-It's also the one cached endpoint whose cache isn't scoped per user — the
-content doesn't vary by caller (it's market-wide, not personalized), so every
-caller shares the same cached response for a given `period`/`date`/`limit`.
+It's also one of two cached endpoints whose cache isn't scoped per user (the
+other is [Corporate Actions](#corporate-actions) below) — the content doesn't
+vary by caller, so every caller shares the same cached response for a given
+set of query params.
+
+## Corporate Actions
+
+`GET /v1/corporate-actions` is a browse/calendar view of dividends, rights
+issues, and share splits — full announcement detail (amounts, ratios,
+ex-dates), not a price-adjustment factor. It's a different surface from two
+other endpoints, each serving a distinct purpose:
+
+| | `/v1/corporate-actions` | OHLC adjustment events | `/v1/announcements/:symbol` |
+|---|---|---|---|
+| Purpose | Browse what's been announced / what's coming up | Explain why a price series moved | General disclosures (board changes, AGM/EGM, suspensions, etc.) |
+| Scope | Any range, or unfiltered, market-wide or one company | Whatever range you asked `get_ohlc_data` for | Company-specific |
+| Detail | Full type-specific fields | Minimal: `{date, kind, factor, detail, adjusted}` | Free-text `description` |
+
+**No default date restriction** — omit `from`/`to` entirely and you get every
+corporate action in the dataset, past and future, oldest first (same
+convention as `/v1/macro/data`/`/v1/indices/:index/data`). To see upcoming
+ones specifically, pass `from=<today>`.
+
+`symbol` (optional) resolves to the base company, not one instrument — a
+corporate action can apply to any/all of a company's share classes, so the
+filter matches every instrument of the resolved company. Omit it for a
+market-wide calendar. `kind` (optional: `split`\|`rights`\|`dividend`)
+narrows to one type.
+
+Uses the same `limit`/`offset`/`hasMore`/`nextOffset` pagination as
+`ohlc`/`technicals` — see [Pagination](#pagination-ohlc-technicals-and-corporate-actions).
 
 ## CSV Response Format
 
 Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
-`/v1/financials/:symbol`, `/v1/announcements/:symbol`, `/v1/macro/series`,
-`/v1/macro/data`, `/v1/indices`, `/v1/indices/:index/data`,
-`/v1/screener/stocks`, `/v1/screener/indices`, `/v1/technicals/:symbol`)
+`/v1/financials/:symbol`, `/v1/financials/:symbol/statement`,
+`/v1/announcements/:symbol`, `/v1/macro/series`, `/v1/macro/data`,
+`/v1/indices`, `/v1/indices/:index/data`, `/v1/screener/stocks`,
+`/v1/screener/indices`, `/v1/technicals/:symbol`, `/v1/corporate-actions`)
 accepts `?format=csv` as an alternative to the default JSON envelope. JSON
 stays the default. `/v1/market-summary` is the one exception — see
 [Market Summary](#market-summary).
@@ -303,7 +363,8 @@ instead:
 | `X-Adjustments` | OHLC only — active `adjust_*` flags, comma-joined, e.g. `splits,rights` |
 | `X-Adjustment-Events` | OHLC only — corporate actions in range, `date:kind:factor:adjusted` quads joined by `;` — see [Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only) |
 | `X-Screen-Date` | Screener only — the trade date the results were computed for |
-| `X-Has-More` / `X-Next-Offset` | OHLC and Technicals only — see [Pagination](#pagination-ohlc-and-technicals) |
+| `X-Has-More` / `X-Next-Offset` | OHLC, Technicals, and Corporate Actions only — see [Pagination](#pagination-ohlc-technicals-and-corporate-actions) |
+| `X-Company-Type` | Financial statement only (`/v1/financials/:symbol/statement`) — which variant (`group`/`company`) was actually served |
 | `X-Result-Count` | Always |
 
 **Ambiguous and not-found responses always stay JSON** regardless of
@@ -354,7 +415,7 @@ Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `interval` (`daily` |
 (booleans, default `true`/`false`/`false` — see
 [Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only)),
 `limit` (default 50, max 500), `offset` (default 0) — see
-[Pagination](#pagination-ohlc-and-technicals), `format` (optional, `csv`).
+[Pagination](#pagination-ohlc-technicals-and-corporate-actions), `format` (optional, `csv`).
 
 ```json
 {
@@ -392,11 +453,38 @@ Response `meta` additionally includes `name` and `resolvedFrom` when resolved
 by name/fuzzy match. Row fields: `period`, `revenue`, `net_income`, `eps`,
 `total_assets`, `total_equity`.
 
+### `GET /v1/financials/:symbol/statement`
+
+Full line-item detail for one financial statement — see
+[Financial Statements](#financial-statements) for how this differs from the
+compact trend above. Statements are entity-level and always resolve to the
+voting-shares (`.N0000`) instrument regardless of the input's suffix.
+
+Query params: `statement` (required — `income`\|`balance`\|`cashflow`),
+`company_type` (optional — `group`\|`company`; omit to try `group` then fall
+back to `company` automatically), `format` (optional, `csv`).
+
+The response reorganizes the source data into a table — rows are line items,
+columns are fiscal periods (most recent first). Rows with no data in any
+period are dropped. Response `meta` additionally includes `name`,
+`resolvedFrom`, `statement`, `companyType` (variant actually served),
+`columns` (fiscal period labels), and `savedAt`. Response rows:
+`{ "label": "...", "canonical_key": "...", "values": { "<period>": <number|null>, ... } }`
+in JSON; in CSV, `values` is flattened so each period becomes its own column.
+
 ### `GET /v1/announcements/:symbol`
 
-Corporate announcements. Accepts a ticker, base symbol, company name, or typo
-of either — `AAF`, `AAF.N0000`, and `Asia Asset Finance` all return the same
-data. Query params: `from`, `to` (optional, same default window), `format`
+General CSE disclosures (board changes, AGM/EGM notices, listings, trading
+suspensions/resumptions, name changes, etc.) in compact envelope. Accepts a
+ticker, base symbol, company name, or typo of either — `AAF`, `AAF.N0000`,
+and `Asia Asset Finance` all return the same data.
+
+**For dividends, rights issues, or share splits specifically, use
+[`GET /v1/corporate-actions`](#get-v1corporate-actions) instead** — this
+endpoint's `description` field is free text; `/v1/corporate-actions` has
+structured amounts/ratios/ex-dates.
+
+Query params: `from`, `to` (optional, same default window), `format`
 (optional, `csv`).
 
 Response `meta` additionally includes `name` and `resolvedFrom`. Row fields:
@@ -487,7 +575,7 @@ symbol/name/abbreviation, or typo of any.
 
 Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `limit` (default 50,
 max 500), `offset` (default 0) — see
-[Pagination](#pagination-ohlc-and-technicals), `format` (optional, `csv`).
+[Pagination](#pagination-ohlc-technicals-and-corporate-actions), `format` (optional, `csv`).
 
 Response `meta` additionally includes `resolvedFrom` when resolved by
 name/abbreviation/fuzzy match, and `hasMore`/`nextOffset` for pagination.
@@ -541,10 +629,37 @@ headline index is a weighted average across every sub-sector, not a peer of
 its own components). Returns `404` if there's no market data on or before
 the reference date at all.
 
+### `GET /v1/corporate-actions`
+
+Corporate action calendar — see [Corporate Actions](#corporate-actions) for
+how this differs from OHLC adjustment events and general announcements.
+Accepts a ticker or company name for `symbol` (typo-tolerant, matches every
+share class of the company), or omit for a market-wide calendar.
+
+Query params: `symbol` (optional), `kind` (optional:
+`split`\|`rights`\|`dividend`), `from`/`to` (`YYYY-MM-DD`, optional — no
+default restriction, omit both for the full dataset), `limit` (default 50,
+max 500), `offset` (default 0), `format` (optional, `csv`). Returns the
+ambiguous-candidates shape if `symbol` matches more than one company, `404`
+if it matches none.
+
+Response `meta` additionally includes `name`/`resolvedFrom` when `symbol` was
+resolved by name/fuzzy match, and `hasMore`/`nextOffset` for pagination.
+Response row fields (union across the three kinds — fields for a different
+kind are simply absent on a given row): `symbol`, `name`, `kind`,
+`announced_date`, `effective_date`, `pdf_url`, `remarks`, plus kind-specific
+fields — split: `type`, `split_factor`, `existing_shares`,
+`resulting_shares`, `proportion_text`; rights: `entitlement_ratio`,
+`issue_price`, `record_date`, `allotment_date`, `trading_commencement`,
+`proportion_text`; dividend: `div_type`, `amount_per_share`, `record_date`,
+`payment_date`.
+
 ## Caching
 
-`GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials`,
-`/v1/announcements`, `/v1/indices`, `/v1/screener`, `/v1/technicals`, and
-`/v1/market-summary` are cached for up to 5 minutes. `/v1/market-summary`'s
-cache is shared across all callers rather than scoped per user — see
-[Market Summary](#market-summary).
+`GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials` (both the
+compact trend and full statement), `/v1/announcements`, `/v1/indices`,
+`/v1/screener`, `/v1/technicals`, `/v1/market-summary`, and
+`/v1/corporate-actions` are cached for up to 5 minutes.
+`/v1/market-summary`'s and `/v1/corporate-actions`'s caches are shared across
+all callers rather than scoped per user — see
+[Market Summary](#market-summary) and [Corporate Actions](#corporate-actions).
