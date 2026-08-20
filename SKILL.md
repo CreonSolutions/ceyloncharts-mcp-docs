@@ -101,6 +101,6 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
 | `GET /v1/market-summary` | `get_market_summary` | see gotcha 5 |
 
 Full param/response shapes: [docs/rest-api.md](docs/rest-api.md) (REST),
-[docs/mcp-tools.md](docs/mcp-tools.md) (MCP). Rate limits (basic 100/hr, pro
-1000/hr, business 10000/hr): [docs/rate-limits.md](docs/rate-limits.md).
+[docs/mcp-tools.md](docs/mcp-tools.md) (MCP). Rate limits (basic 20/hr, pro
+100/hr, business 10000/hr): [docs/rate-limits.md](docs/rate-limits.md).
 Runnable curl/Python/Node snippets: [examples/](examples/).

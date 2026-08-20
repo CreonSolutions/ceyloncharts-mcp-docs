@@ -107,7 +107,7 @@ Full param/response shapes: [docs/rest-api.md](docs/rest-api.md) (REST),
 
 ## Rate limits
 
-Per-user, per-hour: basic 100, pro 1000, business 10000. See
+Per-user, per-hour: basic 20, pro 100, business 10000. See
 [docs/rate-limits.md](docs/rate-limits.md).
 
 ## Runnable examples

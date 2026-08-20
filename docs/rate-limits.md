@@ -4,8 +4,8 @@ Limits are enforced per user, per rolling one-hour window, based on your account
 
 | Plan | Requests/hour |
 |------|---------------|
-| Basic | 100 |
-| Pro | 1,000 |
+| Basic | 20 |
+| Pro | 100 |
 | Business | 10,000 |
 
 ## Response Headers
@@ -38,3 +38,6 @@ retry).
 - Need a higher limit? Visit https://www.ceyloncharts.com to upgrade your plan
   — the new limit applies immediately to your existing API key, no need to
   regenerate it.
+- The Basic tier's 20 requests/hour is easy to hit if you're iterating on
+  code that calls the API repeatedly (e.g. a test loop) — a Pro key gives
+  you more headroom for that kind of workflow.
