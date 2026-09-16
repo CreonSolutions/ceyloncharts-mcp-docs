@@ -20,7 +20,7 @@ OAuth — no bridge or local process required.
    handles token storage and refresh automatically.
 3. Enable the connector for a conversation via the **+** button in the message
    composer → **Connectors**, if it isn't already toggled on.
-4. The thirteen tools listed in [mcp-tools.md](mcp-tools.md) will appear as available
+4. The fifteen tools listed in [mcp-tools.md](mcp-tools.md) will appear as available
    tools once connected.
 
 ## Option 2 — ChatGPT (Developer Mode)

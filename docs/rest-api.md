@@ -67,8 +67,9 @@ Errors follow:
 ## Symbol & Series Resolution
 
 The `:symbol` path parameter (`/v1/symbols/:symbol`, `/v1/ohlc/:symbol`,
-`/v1/financials/:symbol`, `/v1/announcements/:symbol`), the `series_id` query
-parameter (`/v1/macro/data`), and the `:index` path parameter
+`/v1/financials/:symbol`, `/v1/announcements/:symbol`,
+`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`), the `series_id`
+query parameter (`/v1/macro/data`), and the `:index` path parameter
 (`/v1/indices/:index`, `/v1/indices/:index/data`) all accept more than an exact
 identifier. Each is resolved in order:
 
@@ -105,7 +106,7 @@ shape instead of data:
 
 If nothing matches at all, the endpoint returns the usual `404 Not Found`.
 
-### Multi-instrument companies (OHLC only)
+### Multi-instrument companies (OHLC and Foreign Holdings)
 
 A company can have more than one tradable instrument (share class),
 distinguished by ticker suffix:
@@ -118,9 +119,10 @@ distinguished by ticker suffix:
 | `D` | debentures |
 | `P` | preferential |
 
-`GET /v1/ohlc/:symbol` is the only endpoint where this matters (financials and
-announcements are company-level, not per-instrument). Given a bare symbol or
-name with no suffix:
+`GET /v1/ohlc/:symbol` and `GET /v1/foreign-holdings/:symbol` are the only
+endpoints where this matters (financials, announcements, and shareholders
+are company-level, not per-instrument). Given a bare symbol or name with no
+suffix:
 
 - If the company has exactly one instrument, it resolves automatically.
 - If it has several and one is the voting (`N`) instrument, that one is used by
@@ -202,11 +204,11 @@ dipped, rather than mistaking it for noise:
   and `X-Adjustment-Events` header (`date:kind:factor:adjusted` quads joined by
   `;`).
 
-## Pagination (OHLC, Technicals, and Corporate Actions)
+## Pagination (OHLC, Technicals, Corporate Actions, and Foreign Holdings)
 
-`GET /v1/ohlc/:symbol`, `GET /v1/technicals/:symbol`, and
-`GET /v1/corporate-actions` share the same pagination model. Three params
-control the window:
+`GET /v1/ohlc/:symbol`, `GET /v1/technicals/:symbol`,
+`GET /v1/corporate-actions`, and `GET /v1/foreign-holdings/:symbol` share the
+same pagination model. Three params control the window:
 
 | Param | Default | Meaning |
 |-------|---------|---------|
@@ -280,7 +282,7 @@ Row fields omit `above_sma10`/`above_ema21`/`above_ema50`/`above_ema200`
 are in the row) but keep `is_52w_high`/`is_52w_low`/`is_hve`/`is_hv1`/`is_hvytd`
 (not derivable from anything else in the row).
 
-Shares the [pagination model](#pagination-ohlc-technicals-and-corporate-actions) with OHLC.
+Shares the [pagination model](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings) with OHLC.
 
 ## Market Summary
 
@@ -329,7 +331,42 @@ market-wide calendar. `kind` (optional: `split`\|`rights`\|`dividend`)
 narrows to one type.
 
 Uses the same `limit`/`offset`/`hasMore`/`nextOffset` pagination as
-`ohlc`/`technicals` — see [Pagination](#pagination-ohlc-technicals-and-corporate-actions).
+`ohlc`/`technicals` — see [Pagination](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings).
+
+## Foreign Holdings
+
+`GET /v1/foreign-holdings/:symbol` is a daily foreign-shareholding
+percentage series. Unlike financials/announcements/corporate-actions, this
+data is keyed **per instrument**, not per company — a voting share and its
+non-voting counterpart can carry different foreign-holding levels — so it
+resolves exactly like [`GET /v1/ohlc/:symbol`](#get-v1ohlcsymbol): the
+voting-shares instrument is used by default unless an explicit suffix (e.g.
+`SAMP.X0000`) is given, and it shares OHLC's
+[pagination model](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings).
+
+`pct` is computed and sanity-clamped to `null` outside `[0, 100]` rather than
+trusted from the source feed — a `null` means the source data was
+internally inconsistent for that day (a known data-quality issue on at least
+one symbol), not a true zero.
+
+## Shareholders
+
+`GET /v1/shareholders/:symbol` is the top-20 ranked shareholder list per
+company, one snapshot per filed quarter. It resolves and keys exactly like
+[`GET /v1/financials/:symbol/statement`](#get-v1financialssymbolstatement) —
+entity-level, always the voting-shares (`.N0000`) instrument regardless of
+the input's suffix — since a company files one shareholder register, not
+one per share class.
+
+Unlike every other list endpoint here, the default scope is **the latest
+quarter only**, not the full dataset — pass `all=true` for every quarter on
+record (oldest first), or `quarter=<label>` (exactly as it appears in
+`meta.quarters`, e.g. `"Mar 2025"`) for one specific historical snapshot.
+`meta.quarters` always lists every available quarter regardless of scope.
+
+Response rows are flattened to one row per (quarter, shareholder) rather
+than the source's nested per-quarter shape, and a baked-in rank prefix is
+stripped from `name` (e.g. `"1  Mr John Doe"` → `"Mr John Doe"`).
 
 ## CSV Response Format
 
@@ -337,7 +374,8 @@ Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
 `/v1/financials/:symbol`, `/v1/financials/:symbol/statement`,
 `/v1/announcements/:symbol`, `/v1/macro/series`, `/v1/macro/data`,
 `/v1/indices`, `/v1/indices/:index/data`, `/v1/screener/stocks`,
-`/v1/screener/indices`, `/v1/technicals/:symbol`, `/v1/corporate-actions`)
+`/v1/screener/indices`, `/v1/technicals/:symbol`, `/v1/corporate-actions`,
+`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`)
 accepts `?format=csv` as an alternative to the default JSON envelope. JSON
 stays the default. `/v1/market-summary` is the one exception — see
 [Market Summary](#market-summary).
@@ -359,11 +397,11 @@ instead:
 | `X-Resolved-Series-Id` | Always (`/v1/macro/data` only) |
 | `X-Resolved-From` | Resolution used name/fuzzy matching (differs from the resolved identifier) |
 | `X-Resolved-Name` | Endpoint returns company/series-level data (financials, announcements, macro data) |
-| `X-Other-Instruments` | OHLC only — sibling instruments of the same company, `symbol:type` pairs joined by `;`, e.g. `SAMP.X0000:non-voting` |
+| `X-Other-Instruments` | OHLC and Foreign Holdings only — sibling instruments of the same company, `symbol:type` pairs joined by `;`, e.g. `SAMP.X0000:non-voting` |
 | `X-Adjustments` | OHLC only — active `adjust_*` flags, comma-joined, e.g. `splits,rights` |
 | `X-Adjustment-Events` | OHLC only — corporate actions in range, `date:kind:factor:adjusted` quads joined by `;` — see [Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only) |
 | `X-Screen-Date` | Screener only — the trade date the results were computed for |
-| `X-Has-More` / `X-Next-Offset` | OHLC, Technicals, and Corporate Actions only — see [Pagination](#pagination-ohlc-technicals-and-corporate-actions) |
+| `X-Has-More` / `X-Next-Offset` | OHLC, Technicals, Corporate Actions, and Foreign Holdings only — see [Pagination](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings) |
 | `X-Company-Type` | Financial statement only (`/v1/financials/:symbol/statement`) — which variant (`group`/`company`) was actually served |
 | `X-Result-Count` | Always |
 
@@ -415,7 +453,7 @@ Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `interval` (`daily` |
 (booleans, default `true`/`false`/`false` — see
 [Corporate Action Adjustments](#corporate-action-adjustments-ohlc-only)),
 `limit` (default 50, max 500), `offset` (default 0) — see
-[Pagination](#pagination-ohlc-technicals-and-corporate-actions), `format` (optional, `csv`).
+[Pagination](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings), `format` (optional, `csv`).
 
 ```json
 {
@@ -575,7 +613,7 @@ symbol/name/abbreviation, or typo of any.
 
 Query params: `from` (`YYYY-MM-DD`), `to` (`YYYY-MM-DD`), `limit` (default 50,
 max 500), `offset` (default 0) — see
-[Pagination](#pagination-ohlc-technicals-and-corporate-actions), `format` (optional, `csv`).
+[Pagination](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings), `format` (optional, `csv`).
 
 Response `meta` additionally includes `resolvedFrom` when resolved by
 name/abbreviation/fuzzy match, and `hasMore`/`nextOffset` for pagination.
@@ -654,12 +692,47 @@ fields — split: `type`, `split_factor`, `existing_shares`,
 `proportion_text`; dividend: `div_type`, `amount_per_share`, `record_date`,
 `payment_date`.
 
+### `GET /v1/foreign-holdings/:symbol`
+
+Daily foreign-shareholding percentage series — see
+[Foreign Holdings](#foreign-holdings) for the per-instrument resolution
+(same as OHLC) and the `pct` clamping rule.
+
+Query params: `from`/`to` (`YYYY-MM-DD`, optional), `limit` (default 50, max
+500), `offset` (default 0), `format` (optional, `csv`). Returns the
+ambiguous-candidates shape if the input doesn't resolve to one instrument,
+`404` if the symbol isn't found.
+
+Response `meta` additionally includes `resolvedFrom`/`otherInstruments` when
+relevant, and `hasMore`/`nextOffset` for pagination. Response row fields:
+`date`, `pct` (nullable), `foreign_holding`, `qty_cds` (nullable).
+
+### `GET /v1/shareholders/:symbol`
+
+Top-20 ranked shareholder list — see [Shareholders](#shareholders) for the
+entity-level resolution (same as the financial statement endpoint) and the
+latest-quarter-by-default scoping.
+
+Query params: `quarter` (optional — one exact filed-period label from
+`meta.quarters`, takes precedence over `all`), `all` (optional boolean,
+default `false`), `format` (optional, `csv`). Returns the ambiguous-candidates
+shape if `symbol` matches more than one company, `404` if it matches none or
+no shareholder data has been extracted yet
+(`"Shareholder data not yet available"`), or `400` if `quarter` isn't one of
+`meta.quarters`.
+
+Response `meta` additionally includes `name`/`resolvedFrom` when resolved by
+name/fuzzy match, `quarters` (every filed period on record, oldest first),
+and `quarter` (echoed back when the request scoped to one). Response row
+fields: `quarter`, `rank`, `name`, `shares` (nullable), `pct` (nullable).
+
 ## Caching
 
 `GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials` (both the
 compact trend and full statement), `/v1/announcements`, `/v1/indices`,
-`/v1/screener`, `/v1/technicals`, `/v1/market-summary`, and
-`/v1/corporate-actions` are cached for up to 5 minutes.
-`/v1/market-summary`'s and `/v1/corporate-actions`'s caches are shared across
-all callers rather than scoped per user — see
-[Market Summary](#market-summary) and [Corporate Actions](#corporate-actions).
+`/v1/screener`, `/v1/technicals`, `/v1/market-summary`,
+`/v1/corporate-actions`, `/v1/foreign-holdings`, and `/v1/shareholders` are
+cached for up to 5 minutes. `/v1/market-summary`'s and
+`/v1/corporate-actions`'s caches are shared across all callers rather than
+scoped per user — see [Market Summary](#market-summary) and
+[Corporate Actions](#corporate-actions).

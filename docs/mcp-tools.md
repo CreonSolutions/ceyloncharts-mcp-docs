@@ -286,6 +286,46 @@ Returns CSV, one row per action. Omit all filters to browse everything past
 and future, oldest first; pass `from=<today>` to jump straight to upcoming
 ones, which is the most common need.
 
+### `get_foreign_holdings`
+
+Daily foreign-shareholding percentage series for a symbol — how much of the
+free float is held by foreign investors, tracked day by day. This is
+instrument-specific (a voting share and its non-voting counterpart can carry
+different foreign-holding levels), so it resolves like `get_ohlc_data`: an
+explicit instrument suffix (e.g. `SAMP.X0000`) is honored, otherwise the
+voting-share instrument is used by default.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbol` | string | yes | Ticker or company name, honors an explicit instrument suffix — see [resolution](#symbol--series--index-resolution) |
+| `from` | string (`YYYY-MM-DD`) | no | Optional date bound |
+| `to` | string (`YYYY-MM-DD`) | no | Optional date bound |
+| `limit` | number | no | Max days to return, most recent first. Default 50, max 500 |
+| `offset` | number | no | Skip this many of the most recent matching days — use to page further back |
+
+Returns CSV: `date,pct,foreign_holding,qty_cds`. A `pct` of `null` means the
+source data was internally inconsistent for that day (a known data-quality
+issue), not a true zero. Shares the same pagination model as `get_ohlc_data`
+— defaults to the most recent 50 days; the response note says if more
+history is available and how to page further back with `offset`.
+
+### `get_top20_shareholders`
+
+Top-20 ranked shareholder list for a company, one snapshot per quarter as
+filed. Shareholders are entity-level — like `get_financial_statement`, any
+instrument suffix given is ignored.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbol` | string | yes | Ticker or company name — entity-level, instrument suffix ignored |
+| `quarter` | string | no | Restrict to one filed period exactly as it appears in the response (e.g. `"Mar 2025"`). Takes precedence over `all` |
+| `all` | boolean | no | Return every quarter on record, oldest first, instead of just the latest |
+
+Returns CSV: `quarter,rank,name,shares,pct`. By default returns **only the
+latest quarter** on record — pass `all=true` to see every quarter (useful
+for spotting ownership changes over time) or `quarter` for one specific
+historical snapshot.
+
 ## Example Call
 
 ```json

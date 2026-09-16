@@ -1,17 +1,17 @@
 ---
 name: ceyloncharts-mcp
-description: Reference for calling the CeylonCharts CSE market-data API (REST or MCP) — symbols, OHLC/technicals, financial statements, announcements, corporate actions, indices, screener, market summary. Use when writing code that calls mcp.ceyloncharts.com, debugging a failed call to it, or wiring up its MCP tools.
+description: Reference for calling the CeylonCharts CSE market-data API (REST or MCP) — symbols, OHLC/technicals, financial statements, foreign holdings, shareholders, announcements, corporate actions, indices, screener, market summary. Use when writing code that calls mcp.ceyloncharts.com, debugging a failed call to it, or wiring up its MCP tools.
 ---
 
 # CeylonCharts MCP Server
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history,
-financial statements, general announcements, a corporate-actions calendar
-(dividends/rights/splits), market/sector indices, pre-computed technicals, a
-screener, and a market summary — as a REST API and an MCP server. Both are
-Cloudflare Workers behind the same custom domain. This skill is docs/examples
-only — no server source code here; see [docs/](docs/) for full detail behind
-every summary below.
+financial statements, foreign-shareholding percentage, top-20 shareholders,
+general announcements, a corporate-actions calendar (dividends/rights/splits),
+market/sector indices, pre-computed technicals, a screener, and a market
+summary — as a REST API and an MCP server. Both are Cloudflare Workers behind
+the same custom domain. This skill is docs/examples only — no server source
+code here; see [docs/](docs/) for full detail behind every summary below.
 
 - REST API base: `https://mcp.ceyloncharts.com/api`
 - MCP endpoint: `https://mcp.ceyloncharts.com/mcp/`
@@ -47,13 +47,13 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
    repeating field names per row. Meta moves to `X-Resolved-*`/`X-Has-More`
    response headers instead of a JSON `meta` object. See
    [docs/rest-api.md](docs/rest-api.md#csv-response-format).
-4. **OHLC, technicals, and corporate actions default to a capped page**, not
-   full history — OHLC/technicals default to the last 50 trading days;
-   corporate actions has no date default but is still `limit`/`offset`
-   paginated (default 50). `limit` (max 500) / `offset` page further back;
-   `hasMore`/`nextOffset` say if there's more. A wide `from`/`to` range does
-   not guarantee you got everything. See
-   [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-technicals-and-corporate-actions).
+4. **OHLC, technicals, corporate actions, and foreign holdings default to a
+   capped page**, not full history — OHLC/technicals/foreign-holdings
+   default to the last 50 days; corporate actions has no date default but is
+   still `limit`/`offset` paginated (default 50). `limit` (max 500) /
+   `offset` page further back; `hasMore`/`nextOffset` say if there's more. A
+   wide `from`/`to` range does not guarantee you got everything. See
+   [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings).
 5. **`get_market_summary` and `get_corporate_actions` are the two exceptions**
    to normal caching — both cached, but shared across all callers rather
    than scoped per user, since the content isn't personalized.
@@ -91,6 +91,8 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
 | `GET /v1/financials/:symbol/statement` | `get_financial_statement` | full statement detail, see gotcha 6 |
 | `GET /v1/announcements/:symbol` | `get_announcements` | general disclosures, 365-day default window |
 | `GET /v1/corporate-actions` | `get_corporate_actions` | dividends/rights/splits, see gotcha 7 |
+| `GET /v1/foreign-holdings/:symbol` | `get_foreign_holdings` | per-instrument, resolves and paginates like OHLC |
+| `GET /v1/shareholders/:symbol` | `get_top20_shareholders` | entity-level like statements, latest quarter by default |
 | `GET /v1/macro/series` | `get_macro_series` | |
 | `GET /v1/macro/data` | `get_macro_data` | |
 | `GET /v1/indices` | `get_indices` | ASPI, S&P SL20, sub-indices |

@@ -5,10 +5,10 @@
 # CeylonCharts MCP Server
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history (with
-corporate-action adjustments), full financial statements, corporate
-announcements, a corporate-actions calendar, market/sector indices,
-pre-computed technicals, a market screener, market summaries, and
-macroeconomic indicators — available as:
+corporate-action adjustments), full financial statements, foreign-shareholding
+percentage, top-20 shareholders, corporate announcements, a corporate-actions
+calendar, market/sector indices, pre-computed technicals, a market screener,
+market summaries, and macroeconomic indicators — available as:
 
 - A **REST API** (`https://mcp.ceyloncharts.com/api`)
 - An **MCP server** (`https://mcp.ceyloncharts.com/mcp/`) for AI agents and assistants
@@ -20,7 +20,7 @@ endpoints. It does not contain the server's source code.
 ## Contents
 
 - [Getting Started](docs/getting-started.md) — connect from Claude Web, ChatGPT, Antigravity, Claude Desktop, or plain HTTP
-- [MCP Tools Reference](docs/mcp-tools.md) — the thirteen tools exposed over MCP
+- [MCP Tools Reference](docs/mcp-tools.md) — the fifteen tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
@@ -36,6 +36,8 @@ endpoints. It does not contain the server's source code.
 | `get_financial_statement` | Full income statement, balance sheet, or cash flow statement detail |
 | `get_announcements` | General CSE disclosures (board changes, AGM/EGM, suspensions, etc.) |
 | `get_corporate_actions` | Corporate-actions calendar: dividends, rights issues, share splits |
+| `get_foreign_holdings` | Daily foreign-shareholding percentage series for a symbol |
+| `get_top20_shareholders` | Top-20 ranked shareholder list for a company, by quarter |
 | `get_macro_series` | List available macroeconomic series |
 | `get_macro_data` | Macroeconomic indicator data |
 | `get_indices` | List CSE market/sector indices (ASPI, S&P SL20, industry sub-indices) |
