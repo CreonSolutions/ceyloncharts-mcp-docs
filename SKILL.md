@@ -1,17 +1,18 @@
 ---
 name: ceyloncharts-mcp
-description: Reference for calling the CeylonCharts CSE market-data API (REST or MCP) — symbols, OHLC/technicals, financial statements, foreign holdings, shareholders, announcements, corporate actions, indices, screener, market summary. Use when writing code that calls mcp.ceyloncharts.com, debugging a failed call to it, or wiring up its MCP tools.
+description: Reference for calling the CeylonCharts CSE market-data API (REST or MCP) — symbols, OHLC/technicals, live quotes, chart images, financial statements, foreign holdings, shareholders, announcements, corporate actions, indices, screener, market summary. Use when writing code that calls mcp.ceyloncharts.com, debugging a failed call to it, or wiring up its MCP tools.
 ---
 
 # CeylonCharts MCP Server
 
-Colombo Stock Exchange (CSE) market data — symbols, OHLC price history,
-financial statements, foreign-shareholding percentage, top-20 shareholders,
-general announcements, a corporate-actions calendar (dividends/rights/splits),
-market/sector indices, pre-computed technicals, a screener, and a market
-summary — as a REST API and an MCP server. Both are Cloudflare Workers behind
-the same custom domain. This skill is docs/examples only — no server source
-code here; see [docs/](docs/) for full detail behind every summary below.
+Colombo Stock Exchange (CSE) market data — symbols, OHLC price history, live
+price quotes, candlestick chart images, financial statements,
+foreign-shareholding percentage, top-20 shareholders, general announcements,
+a corporate-actions calendar (dividends/rights/splits), market/sector
+indices, pre-computed technicals, a screener, and a market summary — as a
+REST API and an MCP server. Both are Cloudflare Workers behind the same
+custom domain. This skill is docs/examples only — no server source code
+here; see [docs/](docs/) for full detail behind every summary below.
 
 - REST API base: `https://mcp.ceyloncharts.com/api`
 - MCP endpoint: `https://mcp.ceyloncharts.com/mcp/`
@@ -43,7 +44,8 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
    assuming `data`/CSV rows are present. See
    [docs/rest-api.md](docs/rest-api.md#symbol--series-resolution).
 3. **`?format=csv` is opt-in and token-cheaper**, on every list/range
-   endpoint except `/v1/market-summary` — one header row instead of
+   endpoint except `/v1/market-summary` (no CSV mode at all) and `/v1/chart`
+   (always a PNG image, never JSON or CSV) — one header row instead of
    repeating field names per row. Meta moves to `X-Resolved-*`/`X-Has-More`
    response headers instead of a JSON `meta` object. See
    [docs/rest-api.md](docs/rest-api.md#csv-response-format).
@@ -54,13 +56,12 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
    `offset` page further back; `hasMore`/`nextOffset` say if there's more. A
    wide `from`/`to` range does not guarantee you got everything. See
    [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings).
-5. **`get_market_summary` and `get_corporate_actions` are the two exceptions**
-   to normal caching — both cached, but shared across all callers rather
-   than scoped per user, since the content isn't personalized.
-   `get_market_summary` additionally has no CSV mode at all (JSON only —
-   several small lists, not one table). See
-   [docs/rest-api.md](docs/rest-api.md#market-summary) and
-   [docs/rest-api.md](docs/rest-api.md#corporate-actions).
+5. **Every cached endpoint's cache is shared across all callers**, not
+   scoped per user — the content is public market data that doesn't vary by
+   caller, only by query params. `get_market_summary` additionally has no
+   CSV mode at all (JSON only — several small lists, not one table). See
+   [docs/rest-api.md](docs/rest-api.md#caching) and
+   [docs/rest-api.md](docs/rest-api.md#market-summary).
 6. **`get_financials` (compact multi-quarter trend) is currently disabled**
    as an MCP tool in favor of `get_financial_statement` (full line-item
    detail for one statement type — income/balance/cashflow). The REST
@@ -80,6 +81,20 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
    static-token fallback since `/mcp/` only accepts OAuth bearer tokens. Use
    Claude Web, Claude Desktop, or ChatGPT instead if this comes up. See
    [docs/getting-started.md](docs/getting-started.md).
+9. **`get_quotes`' ambiguous handling is per-row, not whole-response**,
+   unlike every other tool here. A `symbols` batch with one bad entry still
+   returns `200` with data for the symbols that resolved — the bad one gets
+   its own row with `status: "ambiguous"`/`"not_found"` and null price
+   fields, rather than replacing the entire response with the candidates
+   shape. Check `status` per row instead of assuming one ambiguous input
+   fails the batch. See [docs/rest-api.md](docs/rest-api.md#live-quotes).
+10. **`get_chart` returns an image, not text** — the only tool here where
+    the MCP response is an `image` content block (`image/png`) instead of a
+    CSV/text block, and the only REST endpoint that returns raw PNG bytes
+    instead of JSON/CSV. It still falls back to the usual JSON candidates
+    shape for an ambiguous symbol. EOD data only for now — no intraday/live
+    bars yet, even during market hours. See
+    [docs/rest-api.md](docs/rest-api.md#chart-images).
 
 ## Endpoints / tools at a glance
 
@@ -101,6 +116,8 @@ Two independent schemes — see [docs/authentication.md](docs/authentication.md)
 | `GET /v1/screener/stocks` | `screen_stocks` | cross-sectional snapshot, not time series |
 | `GET /v1/screener/indices` | `screen_indices` | |
 | `GET /v1/market-summary` | `get_market_summary` | see gotcha 5 |
+| `GET /v1/quotes` | `get_quotes` | live price snapshot, `symbols` or `all=true`, see gotcha 9 |
+| `GET /v1/chart/:symbol` | `get_chart` | candlestick PNG image, see gotcha 10 |
 
 Full param/response shapes: [docs/rest-api.md](docs/rest-api.md) (REST),
 [docs/mcp-tools.md](docs/mcp-tools.md) (MCP). Rate limits (basic 20/hr, pro

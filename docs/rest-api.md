@@ -68,10 +68,12 @@ Errors follow:
 
 The `:symbol` path parameter (`/v1/symbols/:symbol`, `/v1/ohlc/:symbol`,
 `/v1/financials/:symbol`, `/v1/announcements/:symbol`,
-`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`), the `series_id`
-query parameter (`/v1/macro/data`), and the `:index` path parameter
-(`/v1/indices/:index`, `/v1/indices/:index/data`) all accept more than an exact
-identifier. Each is resolved in order:
+`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`,
+`/v1/chart/:symbol`), the `series_id` query parameter (`/v1/macro/data`), and
+the `:index` path parameter (`/v1/indices/:index`, `/v1/indices/:index/data`)
+all accept more than an exact identifier. `/v1/quotes`'s `symbols` query
+param resolves each comma-separated entry independently through this same
+process. Each is resolved in order:
 
 1. **Exact match** — the identifier as given (e.g. `SAMP`, `SAMP.N0000`, an exact
    `series_id`, or an index symbol/code like `EGY`/`1010`).
@@ -106,7 +108,7 @@ shape instead of data:
 
 If nothing matches at all, the endpoint returns the usual `404 Not Found`.
 
-### Multi-instrument companies (OHLC and Foreign Holdings)
+### Multi-instrument companies (OHLC, Foreign Holdings, Quotes, and Chart)
 
 A company can have more than one tradable instrument (share class),
 distinguished by ticker suffix:
@@ -119,7 +121,8 @@ distinguished by ticker suffix:
 | `D` | debentures |
 | `P` | preferential |
 
-`GET /v1/ohlc/:symbol` and `GET /v1/foreign-holdings/:symbol` are the only
+`GET /v1/ohlc/:symbol`, `GET /v1/foreign-holdings/:symbol`,
+`GET /v1/quotes` (`symbols` mode), and `GET /v1/chart/:symbol` are the only
 endpoints where this matters (financials, announcements, and shareholders
 are company-level, not per-instrument). Given a bare symbol or name with no
 suffix:
@@ -368,6 +371,49 @@ Response rows are flattened to one row per (quarter, shareholder) rather
 than the source's nested per-quarter shape, and a baked-in rank prefix is
 stripped from `name` (e.g. `"1  Mr John Doe"` → `"Mr John Doe"`).
 
+## Live Quotes
+
+`GET /v1/quotes` is a live price snapshot for CSE stocks — sourced from
+Cloudflare Analytics Engine tick data during market hours (09:30–14:30 IST),
+falling back to the last session's `ohlc` close outside that window or when
+today's tick data isn't available yet. Stocks only — no sector/headline
+indices.
+
+Takes exactly one of two mutually exclusive params: `symbols` (comma-separated
+tickers/names, typo-tolerant, up to 50) or `all=true` (every CSE stock in one
+response). Unlike every single-symbol endpoint above, **one bad symbol in a
+`symbols` list doesn't fail the whole request** — each row carries its own
+`status` (`ok`/`ambiguous`/`not_found`/`no_data`), so a typo in one symbol
+doesn't prevent the others from returning data. `candidates` is present only
+on `ambiguous` rows.
+
+Merge rule, most-authoritative first: today's finalized `ohlc` row (once the
+EOD pipeline has run) outranks a live tick; a live tick outranks yesterday's
+close when today's EOD hasn't landed yet; the last known `ohlc` row is the
+final fallback when neither is available. `no_data` means neither exists —
+typically a symbol outside the last 10 days of trading history.
+
+No matter how many different `symbols` combinations are requested, the
+underlying Analytics Engine query itself is cached behind a fixed key and
+runs at most once every 15 seconds globally — not once per unique request —
+to protect the upstream tick dataset from being overwhelmed.
+
+## Chart Images
+
+`GET /v1/chart/:symbol` renders a candlestick + volume chart as a PNG image
+— the only endpoint on this API that isn't JSON or CSV.
+
+Resolves like [`GET /v1/ohlc/:symbol`](#get-v1ohlcsymbol) (per-instrument,
+voting-shares default). Query params: `interval` (`daily`\|`weekly`\|`monthly`,
+default `daily`), `bars` (default 90, max 250), `width` (default 900, range
+200–2000), `height` (default 500, range 150–1200), `theme` (`light`\|`dark`,
+default `light`). EOD data only for now — no intraday/live bars yet, even
+during market hours.
+
+Response is `Content-Type: image/png` on success. An ambiguous or unresolved
+symbol returns the usual JSON candidates shape / `404` instead of an image —
+check `Content-Type` before treating the body as image bytes.
+
 ## CSV Response Format
 
 Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
@@ -375,10 +421,11 @@ Every array-returning endpoint (`/v1/symbols`, `/v1/ohlc/:symbol`,
 `/v1/announcements/:symbol`, `/v1/macro/series`, `/v1/macro/data`,
 `/v1/indices`, `/v1/indices/:index/data`, `/v1/screener/stocks`,
 `/v1/screener/indices`, `/v1/technicals/:symbol`, `/v1/corporate-actions`,
-`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`)
+`/v1/foreign-holdings/:symbol`, `/v1/shareholders/:symbol`, `/v1/quotes`)
 accepts `?format=csv` as an alternative to the default JSON envelope. JSON
-stays the default. `/v1/market-summary` is the one exception — see
-[Market Summary](#market-summary).
+stays the default. `/v1/market-summary` has no CSV mode at all — see
+[Market Summary](#market-summary) — and `/v1/chart/:symbol` isn't JSON or CSV
+to begin with, it always returns a PNG image — see [Chart Images](#chart-images).
 
 ```
 Content-Type: text/csv; charset=utf-8
@@ -726,13 +773,50 @@ name/fuzzy match, `quarters` (every filed period on record, oldest first),
 and `quarter` (echoed back when the request scoped to one). Response row
 fields: `quarter`, `rank`, `name`, `shares` (nullable), `pct` (nullable).
 
+### `GET /v1/quotes`
+
+Live price snapshot — see [Live Quotes](#live-quotes) for the merge rule
+(today's EOD vs. live tick vs. last known close) and the per-row error
+handling.
+
+Query params: exactly one of `symbols` (comma-separated tickers/names, up to
+50) or `all` (boolean — every CSE stock), `format` (optional, `csv`). `400`
+if neither or both of `symbols`/`all` are given, or if `symbols` exceeds 50
+entries.
+
+Response: `{ meta: { mode: "symbols"|"all", count, asOf }, data: [...] }`.
+Row fields: `symbol`, `resolvedFrom` (when resolved by name/fuzzy match),
+`status` (`ok`\|`ambiguous`\|`not_found`\|`no_data`), `price` (nullable),
+`prevClose` (nullable), `change` (nullable), `changePct` (nullable), `asOf`
+(nullable), `candidates` (present only when `status` is `ambiguous`). Unlike
+every other endpoint's ambiguous handling, this is never a whole-response
+replacement — it's a per-row field, since a batch request can have some
+symbols resolve fine and others not.
+
+### `GET /v1/chart/:symbol`
+
+Candlestick + volume chart PNG — see [Chart Images](#chart-images) for the
+resolution rule and why this endpoint isn't JSON or CSV.
+
+Query params: `interval` (`daily`\|`weekly`\|`monthly`, default `daily`),
+`bars` (default 90, max 250), `width` (default 900, range 200–2000),
+`height` (default 500, range 150–1200), `theme` (`light`\|`dark`, default
+`light`). Returns the ambiguous-candidates shape (JSON) if the input doesn't
+resolve to one instrument, `404` if the symbol isn't found or has no price
+history yet, `400` for an out-of-range query param.
+
+Response on success: `Content-Type: image/png`, raw PNG bytes.
+
 ## Caching
 
 `GET` responses under `/v1/symbols`, `/v1/ohlc`, `/v1/financials` (both the
 compact trend and full statement), `/v1/announcements`, `/v1/indices`,
 `/v1/screener`, `/v1/technicals`, `/v1/market-summary`,
-`/v1/corporate-actions`, `/v1/foreign-holdings`, and `/v1/shareholders` are
-cached for up to 5 minutes. `/v1/market-summary`'s and
-`/v1/corporate-actions`'s caches are shared across all callers rather than
-scoped per user — see [Market Summary](#market-summary) and
-[Corporate Actions](#corporate-actions).
+`/v1/corporate-actions`, `/v1/foreign-holdings`, `/v1/shareholders`,
+`/v1/quotes`, and `/v1/chart` are all cached — 5 minutes by default,
+except `/v1/quotes` (15 seconds) and `/v1/chart` (45 seconds), both shorter
+to reflect how quickly their underlying data changes. Every one of these
+caches is **shared across all callers** rather than scoped per user — the
+response content is public market data that doesn't vary by caller, only by
+query params, so every user benefits from the same cached entry instead of
+each paying for their own upstream query.

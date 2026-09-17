@@ -6,12 +6,13 @@ for exact request/response shapes; this file is for orientation and gotchas.
 
 ## What this is
 
-Colombo Stock Exchange (CSE) market data — symbols, OHLC price history,
-financial statements, foreign-shareholding percentage, top-20 shareholders,
-general announcements, a corporate-actions calendar (dividends/rights/splits),
-market/sector indices, pre-computed technicals, a screener, and a market
-summary — as a REST API and an MCP server. Both are Cloudflare Workers behind
-the same custom domain.
+Colombo Stock Exchange (CSE) market data — symbols, OHLC price history, live
+price quotes, candlestick chart images, financial statements,
+foreign-shareholding percentage, top-20 shareholders, general announcements,
+a corporate-actions calendar (dividends/rights/splits), market/sector
+indices, pre-computed technicals, a screener, and a market summary — as a
+REST API and an MCP server. Both are Cloudflare Workers behind the same
+custom domain.
 
 - REST API base: `https://mcp.ceyloncharts.com/api`
 - MCP endpoint: `https://mcp.ceyloncharts.com/mcp/`
@@ -47,10 +48,12 @@ Two independent auth schemes, pick one per how you're connecting — see
    instead of data — check for this shape, don't assume `data`/CSV rows are
    always present. See [docs/rest-api.md](docs/rest-api.md#symbol--series-resolution).
 3. **`?format=csv` is opt-in and token-cheaper.** Every list/range endpoint
-   except `/v1/market-summary` accepts `?format=csv` — one header row instead
-   of repeating field names per row, ~3x smaller for typical OHLCV data. Meta
-   fields move to `X-Resolved-*`/`X-Has-More`/etc. response headers instead
-   of a JSON `meta` object. See [docs/rest-api.md](docs/rest-api.md#csv-response-format).
+   except `/v1/market-summary` (no CSV mode at all) and `/v1/chart` (always a
+   PNG image, never JSON or CSV) accepts `?format=csv` — one header row
+   instead of repeating field names per row, ~3x smaller for typical OHLCV
+   data. Meta fields move to `X-Resolved-*`/`X-Has-More`/etc. response
+   headers instead of a JSON `meta` object. See
+   [docs/rest-api.md](docs/rest-api.md#csv-response-format).
 4. **OHLC, technicals, corporate actions, and foreign holdings default to a
    capped page**, not full history — OHLC/technicals/foreign-holdings default
    to the last 50 days; corporate actions has no date default at all but is
@@ -59,13 +62,12 @@ Two independent auth schemes, pick one per how you're connecting — see
    when there's more. Don't assume you got everything back from a wide
    `from`/`to` range. See
    [docs/rest-api.md](docs/rest-api.md#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings).
-5. **`get_market_summary` and `get_corporate_actions` are the two exceptions**
-   to normal caching — both are cached but the cache is shared across all
-   callers rather than scoped per user, since the content isn't personalized.
-   `get_market_summary` additionally has no CSV mode at all (JSON only — it's
-   a bundle of several small lists, not one table). See
-   [docs/rest-api.md](docs/rest-api.md#market-summary) and
-   [docs/rest-api.md](docs/rest-api.md#corporate-actions).
+5. **Every cached endpoint's cache is shared across all callers**, not scoped
+   per user — the content is public market data that doesn't vary by caller,
+   only by query params. `get_market_summary` additionally has no CSV mode at
+   all (JSON only — it's a bundle of several small lists, not one table). See
+   [docs/rest-api.md](docs/rest-api.md#caching) and
+   [docs/rest-api.md](docs/rest-api.md#market-summary).
 6. **`get_financials` (compact multi-quarter trend) is currently disabled**
    as an MCP tool in favor of `get_financial_statement` (full line-item
    detail for one statement type). The REST endpoint
@@ -84,6 +86,20 @@ Two independent auth schemes, pick one per how you're connecting — see
    static-token fallback, since `/mcp/` only accepts OAuth bearer tokens. Use
    Claude Web, Claude Desktop, or ChatGPT instead if you hit this. See
    [docs/getting-started.md](docs/getting-started.md).
+9. **`get_quotes`' ambiguous handling is per-row, not whole-response**, unlike
+   every other tool here. A `symbols` batch with one bad entry still returns
+   `200` with data for the symbols that resolved — the bad one gets its own
+   row with `status: "ambiguous"`/`"not_found"` and null price fields, rather
+   than replacing the entire response with the candidates shape. Check
+   `status` per row instead of assuming one ambiguous input fails the batch.
+   See [docs/rest-api.md](docs/rest-api.md#live-quotes).
+10. **`get_chart` returns an image, not text** — the only tool on this server
+    where the MCP response is an `image` content block (`image/png`) instead
+    of a CSV/text block, and the only REST endpoint that returns raw PNG
+    bytes instead of JSON/CSV. It still falls back to the usual JSON
+    candidates shape for an ambiguous symbol. EOD data only for now — no
+    intraday/live bars yet, even during market hours. See
+    [docs/rest-api.md](docs/rest-api.md#chart-images).
 
 ## Endpoints / tools at a glance
 
@@ -105,6 +121,8 @@ Two independent auth schemes, pick one per how you're connecting — see
 | `GET /v1/screener/stocks` | `screen_stocks` | cross-sectional snapshot, not time series |
 | `GET /v1/screener/indices` | `screen_indices` | |
 | `GET /v1/market-summary` | `get_market_summary` | see gotcha 5 |
+| `GET /v1/quotes` | `get_quotes` | live price snapshot, `symbols` or `all=true`, see gotcha 9 |
+| `GET /v1/chart/:symbol` | `get_chart` | candlestick PNG image, see gotcha 10 |
 
 Full param/response shapes: [docs/rest-api.md](docs/rest-api.md) (REST),
 [docs/mcp-tools.md](docs/mcp-tools.md) (MCP).

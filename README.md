@@ -2,13 +2,16 @@
   <img src="assets/logo-text-light-1024.png" alt="CeylonCharts" width="100%">
 </p>
 
+[![CeylonCharts - Colombo Stocks Exchange (CSE) data for AI Agents MCP connector – tool definition quality and endpoint health on Glama](https://glama.ai/mcp/connectors/com.ceyloncharts.mcp/ceylon-charts/badges/score.svg)](https://glama.ai/mcp/connectors/com.ceyloncharts.mcp/ceylon-charts)
+
 # CeylonCharts MCP Server
 
 Colombo Stock Exchange (CSE) market data — symbols, OHLC price history (with
-corporate-action adjustments), full financial statements, foreign-shareholding
-percentage, top-20 shareholders, corporate announcements, a corporate-actions
-calendar, market/sector indices, pre-computed technicals, a market screener,
-market summaries, and macroeconomic indicators — available as:
+corporate-action adjustments), live price quotes, candlestick chart images,
+full financial statements, foreign-shareholding percentage, top-20
+shareholders, corporate announcements, a corporate-actions calendar,
+market/sector indices, pre-computed technicals, a market screener, market
+summaries, and macroeconomic indicators — available as:
 
 - A **REST API** (`https://mcp.ceyloncharts.com/api`)
 - An **MCP server** (`https://mcp.ceyloncharts.com/mcp/`) for AI agents and assistants
@@ -20,7 +23,7 @@ endpoints. It does not contain the server's source code.
 ## Contents
 
 - [Getting Started](docs/getting-started.md) — connect from Claude Web, ChatGPT, Antigravity, Claude Desktop, or plain HTTP
-- [MCP Tools Reference](docs/mcp-tools.md) — the fifteen tools exposed over MCP
+- [MCP Tools Reference](docs/mcp-tools.md) — the seventeen tools exposed over MCP
 - [REST API Reference](docs/rest-api.md) — endpoints, params, response shapes
 - [Authentication](docs/authentication.md) — API keys and OAuth
 - [Rate Limits](docs/rate-limits.md) — plan tiers and limits
@@ -46,6 +49,8 @@ endpoints. It does not contain the server's source code.
 | `screen_stocks` | Screen CSE stocks by technical criteria (trend, RS rating, 52-week range, volume) |
 | `screen_indices` | Screen sector/headline indices by trend and RS rating |
 | `get_market_summary` | Daily/weekly/monthly market overview: top gainers/losers, activity leaders, index/sector performance |
+| `get_quotes` | Live price snapshot for one or more CSE stocks, or every CSE stock at once |
+| `get_chart` | Candlestick + volume chart image (PNG) for a CSE symbol |
 
 > `get_financials` (compact multi-quarter revenue/income/EPS trend) is
 > currently disabled as an MCP tool in favor of `get_financial_statement` —

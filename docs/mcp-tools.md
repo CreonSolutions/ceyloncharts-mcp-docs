@@ -4,7 +4,13 @@ All tools are called via standard MCP `tools/call` requests.
 
 ## Response Format
 
-Every tool returns a single `text` content block:
+Every tool returns a single `text` content block, with one exception —
+[`get_chart`](#get_chart) returns a single `image` content block (`image/png`)
+instead, since its whole purpose is to hand back a rendered chart rather than
+data to reason over. It still returns the same JSON candidates shape (as
+`text`, not an image) when its input is ambiguous.
+
+For every other tool:
 
 - **Normal results** are CSV (header row + data rows), optionally preceded by a
   short natural-language note when the input was resolved by name/typo, e.g.:
@@ -325,6 +331,42 @@ Returns CSV: `quarter,rank,name,shares,pct`. By default returns **only the
 latest quarter** on record — pass `all=true` to see every quarter (useful
 for spotting ownership changes over time) or `quarter` for one specific
 historical snapshot.
+
+### `get_quotes`
+
+Live price snapshot for CSE stocks — price, change, and change% for one or
+more symbols, or every CSE stock at once. During market hours (09:30–14:30
+IST) this reflects the latest intraday tick; outside market hours it falls
+back to the last session's closing price.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbols` | string | one of `symbols`/`all` | Comma-separated tickers or company names (e.g. `"SAMP,JKH.N0000"`), typo-tolerant, up to 50 |
+| `all` | boolean | one of `symbols`/`all` | Return every CSE stock in one response. Mutually exclusive with `symbols` |
+
+Returns CSV: `symbol,price,prevClose,change,changePct,asOf`, one row per
+symbol. Unlike every other tool here, one bad symbol doesn't fail the whole
+call — a row's implicit status is reflected in null price fields when a
+symbol didn't resolve (ambiguous or not found), while the other symbols in
+the same request still return data.
+
+### `get_chart`
+
+Renders a candlestick + volume chart image (PNG) for a CSE symbol — hand
+this to the user directly instead of describing price action from raw OHLC
+rows. EOD data only for now (daily/weekly/monthly bars) — doesn't yet
+reflect today's live intraday movement.
+
+| Argument | Type | Required | Notes |
+|----------|------|----------|-------|
+| `symbol` | string | yes | Ticker or company name, honors an explicit instrument suffix — see [resolution](#symbol--series--index-resolution) |
+| `interval` | `"daily"` \| `"weekly"` \| `"monthly"` | no | Bar interval. Default `daily` |
+| `bars` | number | no | Number of most-recent bars to show. Default 90, max 250 |
+| `theme` | `"light"` \| `"dark"` | no | Chart color theme. Default `light` |
+
+Returns an **image** content block (`image/png`), not text or CSV — this is
+the only tool on this server that does. If the symbol is ambiguous, returns
+JSON candidates instead of an image, the same shape every other tool uses.
 
 ## Example Call
 
