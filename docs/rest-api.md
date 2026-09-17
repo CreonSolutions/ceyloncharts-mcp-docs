@@ -398,6 +398,19 @@ underlying Analytics Engine query itself is cached behind a fixed key and
 runs at most once every 15 seconds globally — not once per unique request —
 to protect the upstream tick dataset from being overwhelmed.
 
+`get_quotes`'s MCP tool requests `?format=csv` like every other tool here,
+and the CSV columns (`symbol,price,prevClose,change,changePct,asOf`) can't
+carry a per-row `status` or a nested `candidates` list — an ambiguous or
+not-found row just shows up as empty price fields there, same as `no_data`.
+To keep that distinction visible in CSV mode, the endpoint also sets
+`X-Not-Found-Symbols` (comma-joined symbols/queries that resolved to
+nothing) and `X-Ambiguous-Symbols` (`query:SYM1|Label1,SYM2|Label2;...`,
+groups joined by `;`, candidates within a group by `,`, symbol/label by `|`)
+response headers — the MCP tool folds these into a natural-language note
+appended after the CSV table. If you're calling the REST endpoint directly
+and want the full structured `status`/`candidates` per row instead of
+parsing headers, use the default JSON response.
+
 ## Chart Images
 
 `GET /v1/chart/:symbol` renders a candlestick + volume chart as a PNG image
@@ -450,6 +463,8 @@ instead:
 | `X-Screen-Date` | Screener only — the trade date the results were computed for |
 | `X-Has-More` / `X-Next-Offset` | OHLC, Technicals, Corporate Actions, and Foreign Holdings only — see [Pagination](#pagination-ohlc-technicals-corporate-actions-and-foreign-holdings) |
 | `X-Company-Type` | Financial statement only (`/v1/financials/:symbol/statement`) — which variant (`group`/`company`) was actually served |
+| `X-Not-Found-Symbols` | Quotes only — comma-joined symbols/queries that resolved to nothing, present only when at least one did |
+| `X-Ambiguous-Symbols` | Quotes only — `query:SYM1\|Label1,SYM2\|Label2;...` (groups by `;`, candidates by `,`, symbol/label by `\|`), present only when at least one symbol was ambiguous — see [Live Quotes](#live-quotes) |
 | `X-Result-Count` | Always |
 
 **Ambiguous and not-found responses always stay JSON** regardless of

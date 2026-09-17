@@ -10,7 +10,7 @@ instead, since its whole purpose is to hand back a rendered chart rather than
 data to reason over. It still returns the same JSON candidates shape (as
 `text`, not an image) when its input is ambiguous.
 
-For every other tool:
+For every text-returning tool:
 
 - **Normal results** are CSV (header row + data rows), optionally preceded by a
   short natural-language note when the input was resolved by name/typo, e.g.:
@@ -346,9 +346,21 @@ back to the last session's closing price.
 
 Returns CSV: `symbol,price,prevClose,change,changePct,asOf`, one row per
 symbol. Unlike every other tool here, one bad symbol doesn't fail the whole
-call — a row's implicit status is reflected in null price fields when a
-symbol didn't resolve (ambiguous or not found), while the other symbols in
-the same request still return data.
+call — a symbol that didn't resolve just gets empty price fields in its row,
+while the other symbols in the same request still return data.
+
+A trailing note after the table (rather than the usual note prepended before
+it, since this can cover several symbols at once) says which ones were not
+found or ambiguous, e.g.:
+
+```
+symbol,price,prevClose,change,changePct,asOf
+SAMP,102,100,2,2,2025-06-16T08:12:00.000Z
+NOPE999,,,,,
+Bank,,,,,
+
+Not found: NOPE999. "Bank" is ambiguous -- candidates: COMB (Commercial Bank of Ceylon PLC), SAMP (Sampath Bank PLC). Call again with the exact symbol.
+```
 
 ### `get_chart`
 

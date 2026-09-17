@@ -88,11 +88,14 @@ Two independent auth schemes, pick one per how you're connecting — see
    [docs/getting-started.md](docs/getting-started.md).
 9. **`get_quotes`' ambiguous handling is per-row, not whole-response**, unlike
    every other tool here. A `symbols` batch with one bad entry still returns
-   `200` with data for the symbols that resolved — the bad one gets its own
-   row with `status: "ambiguous"`/`"not_found"` and null price fields, rather
-   than replacing the entire response with the candidates shape. Check
-   `status` per row instead of assuming one ambiguous input fails the batch.
-   See [docs/rest-api.md](docs/rest-api.md#live-quotes).
+   `200` with CSV rows for the symbols that resolved — the bad one just comes
+   back with empty `price`/`prevClose`/`change`/`changePct`/`asOf` fields in
+   its row, rather than replacing the entire response with the candidates
+   shape. A trailing note after the table (not the usual note prepended
+   before it) says which symbols were not found or ambiguous, with
+   candidates listed for the ambiguous ones — read that note rather than
+   trying to infer status from the empty row alone. See
+   [docs/rest-api.md](docs/rest-api.md#live-quotes).
 10. **`get_chart` returns an image, not text** — the only tool on this server
     where the MCP response is an `image` content block (`image/png`) instead
     of a CSV/text block, and the only REST endpoint that returns raw PNG
